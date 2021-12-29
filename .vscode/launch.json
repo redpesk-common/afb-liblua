@@ -1,0 +1,29 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+          // lua ../src/lua-binder.lua ../sample/
+          "name": "simple-lua",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "/usr/bin/lua",
+          "args": ["./samples/simple-api.lua"],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [{"name":"LD_LIBRARY_PATH", "value":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"}],
+          "externalConsole": false,
+          "MIMode": "gdb",
+          "setupCommands": [
+            {
+              "description": "Enable pretty-printing for gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+            }
+          ],
+          "miDebuggerPath": "/usr/bin/gdb"
+        },
+    ]
+}

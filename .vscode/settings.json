@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "*.sav": "c",
+        "afb-core.h": "c",
+        "afb-v4.h": "c",
+        "afb-api-common.h": "c",
+        "afb-common.h": "c",
+        "afb-data.h": "c",
+        "afb-apiset.h": "c",
+        "afb-sys.h": "c",
+        "verbose.h": "c"
+    }
+}
