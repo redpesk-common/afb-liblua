@@ -41,8 +41,8 @@ end
 
 -- api verb list
 local demoVerbs = {
-    {uid='lua-ping', verb='ping', func='pingCB'  , info='lua ping demo function'},
-    {uid='lua-args', verb='args', func='argsCB', info='lua check input query', sample={{arg1='arg-one', arg2='arg-two'}, {argA=1, argB=2}}},
+    {uid='lua-ping', verb='ping', callback='pingCB'  , info='lua ping demo function'},
+    {uid='lua-args', verb='args', callback='argsCB', info='lua check input query', sample={{arg1='arg-one', arg2='arg-two'}, {argA=1, argB=2}}},
 }
 
 -- define and instanciate API
@@ -66,17 +66,16 @@ local demoOpts = {
     rootdir = '.'
 }
 
-
 -- executed when binder and all api/interfaces are ready to serv
 function loopBinderCb(binder)
-    libafb.notice(binder, "loopBinderCb=[%s]", libafb.config(binder, "uid"))
+    libafb.notice(binder, "loopBinderCb=%s", libafb.config(binder, "uid"))
     return 0 -- keep running for ever
 end
 
 -- create and start binder
 libafb.luastrict(true)
 local binder= libafb.binder(demoOpts)
-local luaApi= libafb.apiadd(demoApi)
+local glue= libafb.apiadd(demoApi)
 
 -- should never return
 local status= libafb.mainloop('loopBinderCb')

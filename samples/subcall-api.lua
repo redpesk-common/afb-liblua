@@ -28,17 +28,6 @@ package.cpath="./build/package/lib/?.so;;"
 local libafb=require ("afb-luaglue")
 local count= 0
 
--- api control function
-function startApiCb(api, action)
-    local apiname= libafb.config(api, "api")
-    libafb.notice(api, "api=[%s] action=[%s]", apiname, action)
-
-    if (action == 'config') then
-        libafb.notice(api, "config=%s", libafb.config(api))
-    end
-    return 0 -- ok
-end
-
  -- ping/pong test func
 function pingCB(rqt)
     count= count+1
@@ -47,7 +36,7 @@ function pingCB(rqt)
     --return 0, {"pong", count} --implicit response
 end
 
-function asyncRespCB(rqt, ctx, status, response)
+function asyncRespCB(rqt, status, ctx, response)
     libafb.notice  (rqt, "asyncRespCB status=%d ctx='%s', response='%s'", status, libafb.serialize(ctx), response)
     libafb.respond (rqt, status, 'async helloworld/testargs', response)
 end
@@ -67,14 +56,19 @@ end
 function asyncCB(rqt, query)
     libafb.notice  (rqt, "asyncCB calling helloworld/testargs query=%s", query)
 
-    local status= libafb.callasync (rqt,"helloworld","testargs","asyncRespCB", 'user-data', query)
-    if (status ~= 0) then
-        -- force an explicit response
-        libafb.notice  (rqt, "asyncCB fail status=%d", status)
-        libafb.respond (rqt, status, 'async helloworld/testargs fail')
-    end
+    libafb.callasync (rqt,"helloworld","testargs","asyncRespCB", 'user-data', query)
+    -- response within 'asyncRespCB' callback
+end
 
-    -- reponse within 'asyncRespCB' callback
+-- api control function
+function startApiCb(api, action)
+    local apiname= libafb.config(api, "api")
+    libafb.notice(api, "api=[%s] action=[%s]", apiname, action)
+
+    if (action == 'config') then
+        libafb.notice(api, "config=%s", libafb.config(api))
+    end
+    return 0 -- ok
 end
 
 -- executed when binder and all api/interfaces are ready to serv
@@ -92,16 +86,16 @@ end
 
 -- api verb list
 local demoVerbs = {
-    {uid='lua-ping'    , verb='ping' , func='pingCB' , info='lua ping demo function'},
-    {uid='lua-synccall', verb='sync' , func='syncCB' , info='synchronous subcall of private api' , sample={{cezam='open'}, {cezam='close'}}},
-    {uid='lua-asyncall', verb='async', func='asyncCB', info='asynchronous subcall of private api', sample={{cezam='open'}, {cezam='close'}}},
+    {uid='lua-ping'    , verb='ping' , callback='pingCB' , info='lua ping demo function'},
+    {uid='lua-synccall', verb='sync' , callback='syncCB' , info='synchronous subcall of private api' , sample={{cezam='open'}, {cezam='close'}}},
+    {uid='lua-asyncall', verb='async', callback='asyncCB', info='asynchronous subcall of private api', sample={{cezam='open'}, {cezam='close'}}},
 }
 
 -- define and instanciate API
 local demoApi = {
     uid     = 'lua-demo',
     api     = 'demo',
-    class   = 'test',
+    provide   = 'test',
     info    = 'lua api demo',
     verbose = 9,
     export  = 'public',
@@ -132,12 +126,12 @@ local demoOpts = {
 libafb.luastrict(true)
 local binder= libafb.binder(demoOpts)
 local hello = libafb.binding(hellowBinding)
-local luaApi= libafb.apiadd(demoApi)
+local glue= libafb.apiadd(demoApi)
 
 -- should never return
 local status= libafb.mainloop('mainLoopCb')
 if (status < 0) then
-    afb.error (binder, "OnError MainLoop Exit")
+    libafb.error (binder, "OnError MainLoop Exit")
 else
-    afb.notice(binder, "OnSuccess Mainloop Exit")
+    libafb.notice(binder, "OnSuccess Mainloop Exit")
 end

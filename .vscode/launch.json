@@ -25,5 +25,68 @@
           ],
           "miDebuggerPath": "/usr/bin/gdb"
         },
-    ]
+         {
+          // lua ../src/lua-binder.lua ../sample/
+          "name": "subcall-lua",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "/usr/bin/lua",
+          "args": ["./samples/subcall-api.lua"],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [{"name":"LD_LIBRARY_PATH", "value":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"}],
+          "externalConsole": false,
+          "MIMode": "gdb",
+          "setupCommands": [
+            {
+              "description": "Enable pretty-printing for gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+            }
+          ],
+          "miDebuggerPath": "/usr/bin/gdb"
+        },
+        {
+          // lua ../src/lua-binder.lua ../sample/
+          "name": "event-lua",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "/usr/bin/lua",
+          "args": ["./samples/event-api.lua"],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [{"name":"LD_LIBRARY_PATH", "value":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"}],
+          "externalConsole": false,
+          "MIMode": "gdb",
+          "setupCommands": [
+            {
+              "description": "Enable pretty-printing for gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+            }
+          ],
+          "miDebuggerPath": "/usr/bin/gdb"
+        },
+         {
+          // lua ../src/lua-binder.lua ../sample/
+          "name": "test-lua",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "/usr/bin/lua",
+          "args": ["./samples/test-api.lua"],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}",
+          "environment": [{"name":"LD_LIBRARY_PATH", "value":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"}],
+          "externalConsole": false,
+          "MIMode": "gdb",
+          "setupCommands": [
+            {
+              "description": "Enable pretty-printing for gdb",
+              "text": "-enable-pretty-printing",
+              "ignoreFailures": true
+            }
+          ],
+          "miDebuggerPath": "/usr/bin/gdb"
+        },
+     ]
 }

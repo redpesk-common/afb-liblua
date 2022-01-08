@@ -27,44 +27,41 @@ config: following should match your installation paths
 package.cpath="./build/package/lib/?.so;;"
 local libafb=require('afb-luaglue')
 
-
 -- local are static visible only from current file
 local evtCount=0
 
-function StartEventTimer(binder)
-    libafb.notice (binder, "helloworld-event/startTimer")
-    local status= libafb.callsync(binder, "helloworld-event", "startTimer")
-    if (status ~= 0) then
-        -- force an explicit response
-        libafb.notice  (binder, "helloworld event-timer fail status=%d", status)
+function EventReceiveCB(evt, name, lock, data)
+    libafb.notice (evt, "event=%s data=%d", name, data)
+    evtCount= evtCount +1
+    if (evtCount == 5) then
+        libafb.notice (evt, "*** EventReceiveCB releasing lock ***");
+        libafb.schedunlock (evt, lock, evtCount) -- schedunlock(handle, lock, status)
     end
-    return status;
+end
+
+function SchedwaitCB(api, lock, context)
+    evtCount=0
+    libafb.notice (api, "Schedlock timer-event handler register")
+    libafb.evthandler(api, {uid='timer-event', pattern='helloworld-event/timerCount',callback='EventReceiveCB'}, lock)
+    return 0
 end
 
 function EventSubscribe(binder)
     libafb.notice (binder, "helloworld-event", "startTimer")
     local status= libafb.callsync(binder, "helloworld-event", "subscribe")
     if (status ~= 0) then
-        -- force an explicit response
         libafb.notice  (binder, "helloworld subscribe-event fail status=%d", status)
     end
-    return status;
+    return status
 end
 
-function EventReceiveCB(evt, name, ctx, data)
-    libafb.notice (evt, "event=%s data=%d", name, data)
-    evtCount= evtCount +1
-    if (evtCount == 5) then
-        libafb.notice (evt, "*** EventReceiveCB releasing lock ***");
-        libafb.schedunlock (evt, ctx, evtCount) -- schedunlock(handle, lock, status)
+function StartEventTimer(binder)
+    libafb.notice (binder, "helloworld-event/startTimer")
+    local status= libafb.callsync(binder, "helloworld-event", "startTimer")
+    if (status ~= 0) then
+        libafb.notice  (binder, "helloworld event-timer fail status=%d", status)
     end
-end
-
-function SchedwaitCB(api, lock, context)
-    evtCount=0
-    libafb.notice (api, "Schechlock timer-event handler register")
-    libafb.evthandler(api, {uid='timer-event', pattern='helloworld-event/timerCount',func='EventReceiveCB'}, lock)
-    return 0;
+    return status
 end
 
 -- executed when binder and all api/interfaces are ready to serv
@@ -81,7 +78,7 @@ function startTestCB(binder)
     if (status ~=0) then goto done end
 
     libafb.notice (binder, "waiting (%ds) for test to finish", timeout)
-    status= libafb.schedwait(binder, 'SchedwaitCB', timeout, nil)
+    status= libafb.schedwait(binder, timeout, 'SchedwaitCB', nil)
     if (status < 0) then goto done end
 
     ::done::

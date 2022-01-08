@@ -25,7 +25,10 @@ Make sure that your dependencies are reachable from lua scripting engine, before
 ```bash
     export LD_LIBRARY_PATH=/path/to/afb-libglue.so
     export LUA_CPATH=/path/to/afb-libafb.so
-    lua sample/simple-api.lua
+
+    lua samples/simple-api.lua
+    lua samples/...
+    lua samples/test-api.lua
 ```
 
 ## Import afb-luaglue
@@ -106,7 +109,7 @@ local demoApi = {
     verbs   = MyVerbs,
 }
 
-local luaApi= libafb.apiadd(demoApi)
+local glue= libafb.apiadd(demoApi)
 ```
 
 
@@ -140,19 +143,11 @@ function syncCB(rqt, query)
 end
 
 function asyncCB(rqt, query)
-    local status= libafb.callasync(rqt
+    libafb.callasync(rqt
         ,"helloworld","testargs"
         ,"asyncRespCB", 'user-data'
         , query
     )
-    if (status ~= 0) then
-        -- force an explicit response
-        libafb.notice  (rqt, "asyncCB fail status=%d", status)
-        libafb.respond (rqt
-            , status
-            , 'async helloworld/testargs fail'
-        )
-    end
     -- response should come from 'asyncRespCB' callback
 end
 
@@ -230,7 +225,23 @@ In following example, timer runs forever every 'tictime' and call TimerCallback'
 
 ```
 
-afb-libafb timer API is exposed in LUA
+When a one shot timer is enough 'schedpost' is usually a better choice. This is especially true for timeout handling. When use in conjunction with mainloop control.
+
+```lua
+    -- timer handle callback
+    function TimeoutCB (handle, context)
+        -- do something with context
+        libafb.notice (handle, "I'm in timer callback")
+    end
+
+    -- schedpost callback run once and only once
+    jobid= libafb.schedpost (api, 'TimeoutCB', timeoutMS)
+    -- do something
+
+    --
+    libafb.schedcancel (jobid) -- optionally kill timer before timeout.
+```
+
 
 ## Binder MainLoop
 

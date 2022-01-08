@@ -38,14 +38,15 @@
 #include <lauxlib.h>
 
 typedef enum {
-    LUA_BINDER_MAGIC=936714582,
-    LUA_API_MAGIC=852951357,
-    LUA_RQT_MAGIC=684756123,
-    LUA_EVT_MAGIC=894576231,
-    LUA_VCDATA_MAGIC=684756123,
-    LUA_TIMER_MAGIC=4628170,
-    LUA_LOCK_MAGIC=379645852,
-    LUA_HANDLER_MAGIC=579315863,
+    GLUE_BINDER_MAGIC=936714582,
+    GLUE_API_MAGIC=852951357,
+    GLUE_RQT_MAGIC=684756123,
+    GLUE_EVT_MAGIC=894576231,
+    GLUE_VCDATA_MAGIC=684756123,
+    GLUE_TIMER_MAGIC=4628170,
+    GLUE_LOCK_MAGIC=379645852,
+    GLUE_HANDLER_MAGIC=579315863,
+    GLUE_SCHED_MAGIC=73498127,
 } luaGlueMagicsE;
 
 // compiled AFB verb context data
@@ -87,7 +88,7 @@ struct LuaTimerHandleS {
     char *callback;
     afb_timer_t afb;
     json_object *configJ;
-    void *usrdata;
+    void *userdata;
     int usage;
 };
 
@@ -96,6 +97,7 @@ struct LuaEvtHandleS {
     const char *name;
     afb_event_t afb;
     json_object *configJ;
+    afb_api_t apiv4;
     int count;
 };
 
@@ -103,10 +105,10 @@ struct LuaHandlerHandleS {
     const char *uid;
     const char *callback;
     json_object *configJ;
-    void *usrdata;
+    void *userdata;
     int count;
+    afb_api_t apiv4;
 };
-
 
 typedef struct {
     luaGlueMagicsE magic;
@@ -119,8 +121,15 @@ typedef struct {
         struct LuaTimerHandleS timer;
         struct LuaschedwaitS lock;
         struct LuaHandlerHandleS handler;
-    } lua;
-} LuaHandleT;
+    };
+} AfbHandleT;
+
+typedef struct {
+    int magic;
+    AfbHandleT *glue;
+    char *callback;
+    void *userdata;
+} GlueHandleCbT;
 
 #define LUA_FIRST_ARG 1 // 1st argument
 #define LUA_MSG_MAX_LENGTH 2048

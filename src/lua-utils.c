@@ -36,7 +36,7 @@
 
 
 
-void LuaAfbVerbose(LuaHandleT *handle, int level, const char *file, int line, const char *func, const char *fmt, ...)
+void GlueVerbose(AfbHandleT *handle, int level, const char *file, int line, const char *func, const char *fmt, ...)
 {
     va_list args;
 
@@ -44,12 +44,15 @@ void LuaAfbVerbose(LuaHandleT *handle, int level, const char *file, int line, co
     switch (handle->magic)
     {
 
-    case LUA_API_MAGIC:
-        afb_api_vverbose(handle->lua.api.afb, level, file, line, func, fmt, args);
+    case GLUE_HANDLER_MAGIC:
+    case GLUE_API_MAGIC:
+    case GLUE_EVT_MAGIC:
+    case GLUE_LOCK_MAGIC:
+        afb_api_vverbose(GlueGetApi(handle), level, file, line, func, fmt, args);
         break;
 
-    case LUA_RQT_MAGIC:
-        afb_req_vverbose(handle->lua.rqt.afb, level, file, line, func, fmt, args);
+    case GLUE_RQT_MAGIC:
+        afb_req_vverbose(handle->rqt.afb, level, file, line, func, fmt, args);
         break;
 
     default:
@@ -59,10 +62,10 @@ void LuaAfbVerbose(LuaHandleT *handle, int level, const char *file, int line, co
     return;
 }
 
-LuaHandleT *LuaRqtPop(lua_State *luaState, int index)
+AfbHandleT *LuaRqtPop(lua_State *luaState, int index)
 {
-    LuaHandleT *handle = (LuaHandleT *)lua_touserdata(luaState, index);
-    if (handle == NULL || handle->magic != LUA_RQT_MAGIC)
+    AfbHandleT *handle = (AfbHandleT *)lua_touserdata(luaState, index);
+    if (handle == NULL || handle->magic != GLUE_RQT_MAGIC)
         goto OnErrorExit;
     return handle;
 
@@ -70,10 +73,10 @@ OnErrorExit:
     return NULL;
 }
 
-LuaHandleT *LuaEventPop(lua_State *luaState, int index)
+AfbHandleT *LuaEventPop(lua_State *luaState, int index)
 {
-    LuaHandleT *luaEvt = (LuaHandleT *)lua_touserdata(luaState, index);
-    if (!luaEvt || luaEvt->magic != LUA_EVT_MAGIC || !afb_event_is_valid(luaEvt->lua.evt.afb))
+    AfbHandleT *luaEvt = (AfbHandleT *)lua_touserdata(luaState, index);
+    if (!luaEvt || luaEvt->magic != GLUE_EVT_MAGIC || !afb_event_is_valid(luaEvt->evt.afb))
         goto OnErrorExit;
     return luaEvt;
 
@@ -81,20 +84,20 @@ OnErrorExit:
     return NULL;
 }
 
-LuaHandleT *LuaApiPop(lua_State *luaState, int index)
+AfbHandleT *LuaApiPop(lua_State *luaState, int index)
 {
-    LuaHandleT *luaApi = (LuaHandleT *)lua_touserdata(luaState, index);
-    if (!luaApi || luaApi->magic != LUA_API_MAGIC)
+    AfbHandleT *glue = (AfbHandleT *)lua_touserdata(luaState, index);
+    if (!glue || glue->magic != GLUE_API_MAGIC)
         goto OnErrorExit;
-    return luaApi;
+    return glue;
 
 OnErrorExit:
     return NULL;
 }
-LuaHandleT *LuaLockPop(lua_State *luaState, int index)
+AfbHandleT *LuaLockPop(lua_State *luaState, int index)
 {
-    LuaHandleT *luaLock = (LuaHandleT *)lua_touserdata(luaState, index);
-    if (!luaLock || luaLock->magic != LUA_LOCK_MAGIC)
+    AfbHandleT *luaLock = (AfbHandleT *)lua_touserdata(luaState, index);
+    if (!luaLock || luaLock->magic != GLUE_LOCK_MAGIC)
         goto OnErrorExit;
     return luaLock;
 
@@ -103,20 +106,26 @@ OnErrorExit:
 }
 
 // retreive API from lua handle
-afb_api_t LuaAfbGetApi(LuaHandleT*luaHandle) {
+afb_api_t GlueGetApi(AfbHandleT*glue) {
    afb_api_t afbApi;
-    switch (luaHandle->magic) {
-        case LUA_API_MAGIC:
-            afbApi= luaHandle->lua.api.afb;
+    switch (glue->magic) {
+        case GLUE_API_MAGIC:
+            afbApi= glue->api.afb;
             break;
-        case LUA_RQT_MAGIC:
-            afbApi= afb_req_get_api(luaHandle->lua.rqt.afb);
+        case GLUE_RQT_MAGIC:
+            afbApi= afb_req_get_api(glue->rqt.afb);
             break;
-        case LUA_BINDER_MAGIC:
-            afbApi= AfbBinderGetApi(luaHandle->lua.binder.afb);
+        case GLUE_BINDER_MAGIC:
+            afbApi= AfbBinderGetApi(glue->binder.afb);
             break;
-        case LUA_LOCK_MAGIC:
-            afbApi= luaHandle->lua.lock.apiv4;
+        case GLUE_LOCK_MAGIC:
+            afbApi= glue->lock.apiv4;
+            break;
+        case GLUE_EVT_MAGIC:
+            afbApi= glue->evt.apiv4;
+            break;
+        case GLUE_HANDLER_MAGIC:
+            afbApi= glue->handler.apiv4;
             break;
         default:
             afbApi=NULL;
@@ -124,83 +133,83 @@ afb_api_t LuaAfbGetApi(LuaHandleT*luaHandle) {
     return afbApi;
 }
 
-LuaHandleT *LuaTimerPop(lua_State *luaState, int index)
+AfbHandleT *LuaTimerPop(lua_State *luaState, int index)
 {
-    LuaHandleT *luaTimer = (LuaHandleT *)lua_touserdata(luaState, index);
-    if (!luaTimer || luaTimer->magic != LUA_TIMER_MAGIC)
+    AfbHandleT *glue = (AfbHandleT *)lua_touserdata(luaState, index);
+    if (!glue || glue->magic != GLUE_TIMER_MAGIC)
         goto OnErrorExit;
-    return luaTimer;
+    return glue;
 
 OnErrorExit:
     return NULL;
 }
 
 
-void LuaRqtFree(void *usrdata)
+void GlueRqtFree(void *userdata)
 {
-    LuaHandleT *luaRqt= (LuaHandleT*)usrdata;
-    assert (luaRqt && (luaRqt->magic == LUA_RQT_MAGIC));
+    AfbHandleT *glue= (AfbHandleT*)userdata;
+    assert (glue && glue->magic == GLUE_RQT_MAGIC);
 
     // make sure rqt lua stack is empty, then free it
-    lua_settop(luaRqt->luaState,0);
+    lua_settop(glue->luaState,0);
 
-    free(luaRqt);
+    free(glue);
     return;
 }
 
-// add a reference on LuaApi handle
-void LuaRqtAddref(LuaHandleT *luaRqt) {
-    if (luaRqt->magic == LUA_RQT_MAGIC) {
-        afb_req_unref (luaRqt->lua.rqt.afb);
+// add a reference on Glue handle
+void GlueRqtAddref(AfbHandleT *glue) {
+    if (glue->magic == GLUE_RQT_MAGIC) {
+        afb_req_unref (glue->rqt.afb);
     }
 }
 
-// add a reference on LuaApi handle
-void LuaRqtUnref(LuaHandleT *luaRqt) {
-    if (luaRqt->magic == LUA_RQT_MAGIC) {
-        afb_req_unref (luaRqt->lua.rqt.afb);
+// add a reference on Glue handle
+void GlueRqtUnref(AfbHandleT *glue) {
+    if (glue->magic == GLUE_RQT_MAGIC) {
+        afb_req_unref (glue->rqt.afb);
     }
 
 }
 
 // allocate and push a lua request handle
-LuaHandleT *LuaRqtNew(afb_req_t afbRqt)
+AfbHandleT *GlueRqtNew(afb_req_t afbRqt)
 {
     assert(afbRqt);
 
     // retreive interpreteur from API
-    LuaHandleT *luaApi = afb_api_get_userdata(afb_req_get_api(afbRqt));
-    assert(luaApi->magic == LUA_API_MAGIC);
+    AfbHandleT *api = afb_api_get_userdata(afb_req_get_api(afbRqt));
+    assert(api->magic == GLUE_API_MAGIC);
 
-    LuaHandleT *luaRqt = (LuaHandleT *)calloc(1, sizeof(LuaHandleT));
-    luaRqt->magic = LUA_RQT_MAGIC;
-    luaRqt->lua.rqt.afb = afbRqt;
-    luaRqt->luaState = lua_newthread(luaApi->luaState);
+    AfbHandleT *glue = (AfbHandleT *)calloc(1, sizeof(AfbHandleT));
+    glue->magic = GLUE_RQT_MAGIC;
+    glue->rqt.afb = afbRqt;
+    glue->luaState = lua_newthread(api->luaState);
 
     // add lua rqt handle to afb request livecycle
-    afb_req_v4_set_userdata (afbRqt, (void*)luaRqt, LuaRqtFree);
+    afb_req_v4_set_userdata (afbRqt, (void*)glue, GlueRqtFree);
 
-    return luaRqt;
+    return glue;
 }
 
 // reply afb request only once and unref lua handle
-int LuaAfbReply(LuaHandleT *luaRqt, int status, int nbreply, afb_data_t *reply)
+int GlueReply(AfbHandleT *glue, int status, int nbreply, afb_data_t *reply)
 {
-    if (luaRqt->lua.rqt.responded) goto OnErrorExit;
-    afb_req_reply(luaRqt->lua.rqt.afb, status, nbreply, reply);
-    luaRqt->lua.rqt.responded = 1;
+    if (glue->rqt.responded) goto OnErrorExit;
+    afb_req_reply(glue->rqt.afb, status, nbreply, reply);
+    glue->rqt.responded = 1;
     return 0;
 
 OnErrorExit:
-    LuaInfoDbg(luaRqt->luaState, luaRqt, 0, "LuaAfbReply", "unique response require");
+    LuaInfoDbg(glue->luaState, glue, 0, "GlueReply", "unique response require");
     return -1;
 }
 
 // binder handle is pushed as 1st upvalue during lua/C lib creation
-LuaHandleT *LuaBinderPop(lua_State *luaState)
+AfbHandleT *LuaBinderPop(lua_State *luaState)
 {
-    LuaHandleT *handle = lua_touserdata(luaState, lua_upvalueindex(1));
-    assert(handle && handle->magic == LUA_BINDER_MAGIC);
+    AfbHandleT *handle = lua_touserdata(luaState, lua_upvalueindex(1));
+    assert(handle && handle->magic == GLUE_BINDER_MAGIC);
     return handle;
 }
 
@@ -210,7 +219,7 @@ LuaHandleT *LuaBinderPop(lua_State *luaState)
 json_object *LuaTableToJson(lua_State *luaState, int index)
 {
 #define LUA_KEY_INDEX -2
-#define LUA_VALUE_INDEX -1
+#define GLUE_VALUE_INDEX -1
 
     int idx;
     int tableType;
@@ -237,7 +246,7 @@ json_object *LuaTableToJson(lua_State *luaState, int index)
             }
 
             const char *key = lua_tostring(luaState, LUA_KEY_INDEX);
-            json_object *argJ = LuaPopOneArg(luaState, LUA_VALUE_INDEX);
+            json_object *argJ = LuaPopOneArg(luaState, GLUE_VALUE_INDEX);
             if (argJ)
                 json_object_object_add(tableJ, key, argJ);
             else
@@ -259,7 +268,7 @@ json_object *LuaTableToJson(lua_State *luaState, int index)
                 goto OnErrorExit;
             }
 
-            json_object *argJ = LuaPopOneArg(luaState, LUA_VALUE_INDEX);
+            json_object *argJ = LuaPopOneArg(luaState, GLUE_VALUE_INDEX);
             json_object_array_add(tableJ, argJ);
         }
         lua_pop(luaState, 1); // removes 'value'; keeps 'key' for next iteration
@@ -362,7 +371,7 @@ int LuaPushOneArg(lua_State *luaState,json_object *argsJ)
         lua_newtable(luaState);
         json_object_object_foreach(argsJ, key, val)
         {
-            //LUA_AFB_NOTICE(handle, "LuaPushOneArg key='%s' val='%s'", key, json_object_get_string(val));
+            //GLUE_AFB_NOTICE(handle, "LuaPushOneArg key='%s' val='%s'", key, json_object_get_string(val));
             int err = LuaPushOneArg(luaState, val);
             if (!err)
                 lua_setfield(luaState, -2, key);
@@ -409,7 +418,7 @@ OnErrorExit:
 
 // afb_req_v4_get_common(
 
-void LuaInfoDbg(lua_State *luaState, LuaHandleT *handle, int level, const char *func, const char *message)
+void LuaInfoDbg(lua_State *luaState, AfbHandleT *handle, int level, const char *func, const char *message)
 {
     lua_Debug luaDebug;
     const char *error;
@@ -427,12 +436,12 @@ void LuaInfoDbg(lua_State *luaState, LuaHandleT *handle, int level, const char *
 
     if (level != AFB_SYSLOG_LEVEL_ERROR)
     {
-        LuaAfbVerbose(handle, level, source, line, func, "InLua->[%s]", message);
+        GlueVerbose(handle, level, source, line, func, "InLua->[%s]", message);
     }
     else
     {
         error = lua_tostring(luaState, -1);
-        LuaAfbVerbose(handle, level, source, line, func, "InLua->[%s] error=[%s]", message, error);
+        GlueVerbose(handle, level, source, line, func, "InLua->[%s] error=[%s]", message, error);
     }
     return;
 
@@ -471,33 +480,33 @@ int LuaPrintMsg(lua_State *luaState, int level)
     const char *errorMsg = NULL;
 
     // get binder handle
-    LuaHandleT *binder = LuaBinderPop(luaState);
+    AfbHandleT *binder = LuaBinderPop(luaState);
     if (!binder)
         goto OnErrorExit;
 
     // check api handle
-    LuaHandleT *luaHandle = lua_touserdata(luaState, LUA_FIRST_ARG);
-    if (!luaHandle)
+    AfbHandleT *glue = lua_touserdata(luaState, LUA_FIRST_ARG);
+    if (!glue)
     {
         errorMsg = "missing require api/rqt handle";
         goto OnErrorExit;
     }
 
-    switch (luaHandle->magic)
+    switch (glue->magic)
     {
-        case LUA_API_MAGIC:
-            if (!AFB_SYSLOG_MASK_WANT(afb_api_logmask(luaHandle->lua.api.afb), level))
+        case GLUE_API_MAGIC:
+            if (!AFB_SYSLOG_MASK_WANT(afb_api_logmask(glue->api.afb), level))
                 goto OnQuietExit;
             break;
 
-        case LUA_RQT_MAGIC:
-            if (!AFB_SYSLOG_MASK_WANT(afb_req_logmask(luaHandle->lua.rqt.afb), level))
+        case GLUE_RQT_MAGIC:
+            if (!AFB_SYSLOG_MASK_WANT(afb_req_logmask(glue->rqt.afb), level))
                 goto OnQuietExit;
             break;
 
-        case LUA_BINDER_MAGIC:
+        case GLUE_BINDER_MAGIC:
         default:
-            if (!AFB_SYSLOG_MASK_WANT(AfbBinderGetLogMask(luaHandle->lua.binder.afb), level))
+            if (!AFB_SYSLOG_MASK_WANT(AfbBinderGetLogMask(glue->binder.afb), level))
                 goto OnQuietExit;
     }
 
@@ -526,7 +535,7 @@ int LuaPrintMsg(lua_State *luaState, int level)
         if (format[idx] == '%' && format[idx + 1] != '\0')
         {
             json_object *slotJ = json_object_array_get_idx(requestJ, arrayIdx);
-            //if (slotJ) LUA_AFB_NOTICE("**** idx=%d slotJ=%s", arrayIdx, json_object_get_string(slotJ));
+            //if (slotJ) GLUE_AFB_NOTICE("**** idx=%d slotJ=%s", arrayIdx, json_object_get_string(slotJ));
 
             switch (format[++idx])
             {
@@ -564,7 +573,7 @@ int LuaPrintMsg(lua_State *luaState, int level)
             if (uidIdx >= LUA_MSG_MAX_LENGTH)
             {
                 const char *trunc = "... <truncated> ";
-                LUA_AFB_WARNING(luaHandle, "LuaPrintMsg: message[%s] overflow LUA_MSG_MAX_LENGTH=%d\n", format, LUA_MSG_MAX_LENGTH);
+                GLUE_AFB_WARNING(glue, "LuaPrintMsg: message[%s] overflow LUA_MSG_MAX_LENGTH=%d\n", format, LUA_MSG_MAX_LENGTH);
                 uidIdx = LUA_MSG_MAX_LENGTH - 1;
                 memcpy(&message[uidIdx - strlen(trunc)], trunc, strlen(trunc));
                 break;
@@ -578,12 +587,12 @@ int LuaPrintMsg(lua_State *luaState, int level)
     message[uidIdx] = '\0';
 
 PrintMessage:
-    LuaInfoDbg(luaState, luaHandle, level, __func__, message);
+    LuaInfoDbg(luaState, glue, level, __func__, message);
     json_object_put(requestJ);
     return 0; // no argument returned to lua
 
 OnErrorExit:
-    LuaInfoDbg(luaState, luaHandle, level,__func__, errorMsg);
+    LuaInfoDbg(luaState, glue, level,__func__, errorMsg);
     lua_pushlstring(luaState, errorMsg, strlen(errorMsg));
     lua_error(luaState);
     return 1;

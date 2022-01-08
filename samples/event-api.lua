@@ -8,7 +8,7 @@ object:
     event-api.lua
     - 1st create 'demo' api
     - 2nd when API ready, create an event named 'lua-event'
-    - 3rd creates a timer(lua-timer) that tic every 3s and call TimerCallback that fire previsouly created event
+    - 3rd creates a timer(lua-timer) that tic every 3s and call TimerCB that fire previsouly created event
     - 4rd implements two verbs demo/subscribe and demo/unscribe
     - 5rd attaches two events handler to the API evtTimerCB/evtOtherCB those handlers requiere a subcall to subscribe some event
     demo/subscribe|unsubscribe can be requested from REST|websocket from a browser on http:localhost:1234
@@ -47,7 +47,7 @@ function apiControlCb(api, state)
         luaEvent= libafb.evtnew (api,{uid='lua-event', info='lua testing event sample'})
         if (luaEvent == nil) then goto done end
 
-        local timer= libafb.timernew (api, {uid='lua-timer', callback='TimerCallback', period=tictime, count=0}, luaEvent)
+        local timer= libafb.timernew (api, {uid='lua-timer', callback='TimerCB', period=tictime, count=0}, luaEvent)
         if (timer == nil) then goto done end
 
         ::done::
@@ -61,16 +61,15 @@ function apiControlCb(api, state)
 end
 
 -- executed when binder and all api/interfaces are ready to serv
-function startBinderCb(binder)
-    libafb.notice(binder, "startBinderCb=[%s]", libafb.config(binder, "uid"))
-
+function mainLoopCb(binder)
+    libafb.notice(binder, "mainLoopCb=[%s]", libafb.config(binder, "uid"))
     -- implement here after your startup/eventing code
-
+    -- ...
     return 0 -- negative status force mainloop exit
 end
 
 -- timer handle callback
-function TimerCallback (timer, evt)
+function TimerCB (timer, evt)
     count= count +1
     libafb.notice (evt, "timer='%s' event='%s' count=%d", libafb.config(timer, 'uid'), libafb.config(evt, 'uid'), count)
     libafb.evtpush(evt, {count=count})
@@ -86,14 +85,12 @@ end
 function subscribeCB(rqt)
     libafb.notice  (rqt, "subscribing api event")
     libafb.evtsubscribe (rqt, luaEvent)
-
     return 0 -- implicit respond
 end
 
 function unsubscribeCB(rqt)
     libafb.notice  (rqt, "subscribing api event")
     libafb.evtunsubscribe (rqt, luaEvent)
-
     return 0 -- implicit respond
 end
 
@@ -107,22 +104,22 @@ end
 
 -- api verb list
 local apiVerbs = {
-    {uid='lua-ping'       , verb='ping'       , func='pingCB'       , info='ping event function'},
-    {uid='lua-subscribe'  , verb='subscribe'  , func='subscribeCB'  , info='subscribe to event'},
-    {uid='lua-unsubscribe', verb='unsubscribe', func='unsubscribeCB', info='unsubscribe to event'},
+    {uid='lua-ping'       , verb='ping'       , callback='pingCB'       , info='ping event function'},
+    {uid='lua-subscribe'  , verb='subscribe'  , callback='subscribeCB'  , info='subscribe to event'},
+    {uid='lua-unsubscribe', verb='unsubscribe', callback='unsubscribeCB', info='unsubscribe to event'},
 }
 
 local apiEvents = {
-    {uid='lua-event' , pattern='lua-event', func='evtTimerCB' , info='timer event handler'},
-    {uid='lua-other' , pattern='*', func='evtOtherCB' , info='any other event handler'},
+    {uid='lua-event' , pattern='lua-event', callback='evtTimerCB' , info='timer event handler'},
+    {uid='lua-other' , pattern='*', callback='evtOtherCB' , info='any other event handler'},
 }
 
 -- define and instanciate API
-local luaApi = {
+local glue = {
     uid     = 'lua-event',
     info    = 'lua api event demonstration',
     api     = 'event',
-    class   = 'lua-test',
+    provide   = 'lua-test',
     verbose = 9,
     export  = 'public',
     control = 'apiControlCb',
@@ -144,10 +141,10 @@ local binderOpts = {
 -- create and start binder
 libafb.luastrict(true)
 local binder= libafb.binder(binderOpts)
-local luaApi= libafb.apiadd(luaApi)
+local glue= libafb.apiadd(glue)
 
 -- should never return
-local status= libafb.mainloop('startBinderCb')
+local status= libafb.mainloop('mainLoopCb')
 if (status < 0) then
     libafb.error (binder, "OnError MainLoop Exit")
 else

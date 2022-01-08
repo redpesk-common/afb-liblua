@@ -35,42 +35,42 @@
 #include "lua-utils.h"
 #include "lua-callbacks.h"
 
-void LuaTimerClearCb(LuaHandleT *luaTimer) {
+void GlueTimerClear(AfbHandleT *glue) {
 
-    afb_timer_unref (luaTimer->lua.timer.afb);
-    json_object_put(luaTimer->lua.timer.configJ);
-    luaTimer->lua.timer.usage--;
+    afb_timer_unref (glue->timer.afb);
+    json_object_put(glue->timer.configJ);
+    glue->timer.usage--;
 
     // free timer luaState and handle
-    if (luaTimer->lua.timer.usage <= 0) {
-       lua_settop(luaTimer->luaState,0);
-       json_object_put(luaTimer->lua.timer.configJ);
-       free(luaTimer);
+    if (glue->timer.usage <= 0) {
+       lua_settop(glue->luaState,0);
+       json_object_put(glue->timer.configJ);
+       free(glue);
     }
 }
 
-void LuaTimerCb (afb_timer_x4_t timer, void *context, int decount) {
+void GlueTimerCb (afb_timer_x4_t timer, void *context, int decount) {
     const char *errorMsg=NULL;
     int status, isnum;
-    LuaHandleT *luaTimer= (LuaHandleT*)context;
+    AfbHandleT *glue= (AfbHandleT*)context;
 
-    int stack = lua_gettop(luaTimer->luaState);
-    lua_getglobal(luaTimer->luaState, luaTimer->lua.timer.callback);
-    lua_pushlightuserdata(luaTimer->luaState, luaTimer);
-    lua_pushlightuserdata(luaTimer->luaState, luaTimer->lua.timer.usrdata);
+    int stack = lua_gettop(glue->luaState);
+    lua_getglobal(glue->luaState, glue->timer.callback);
+    lua_pushlightuserdata(glue->luaState, glue);
+    lua_pushlightuserdata(glue->luaState, glue->timer.userdata);
 
-    status = lua_pcall(luaTimer->luaState, 2, LUA_MULTRET, 0);
+    status = lua_pcall(glue->luaState, 2, LUA_MULTRET, 0);
     if (status)
     {
 
-        errorMsg=lua_tostring(luaTimer->luaState, -1);
+        errorMsg=lua_tostring(glue->luaState, -1);
         goto OnErrorExit;
     }
 
-    int count = lua_gettop(luaTimer->luaState) - stack;
+    int count = lua_gettop(glue->luaState) - stack;
     if (!count) status=0;
     else {
-        status= (int)lua_tointegerx(luaTimer->luaState, -1, &isnum);
+        status= (int)lua_tointegerx(glue->luaState, -1, &isnum);
         if (!isnum) {
             errorMsg="should return an integer (OK=0)";
             goto OnErrorExit;
@@ -83,16 +83,16 @@ void LuaTimerCb (afb_timer_x4_t timer, void *context, int decount) {
     return;
 
 OnErrorExit:
-    LUA_DBG_ERROR(luaTimer->luaState, luaTimer, errorMsg);
+    LUA_DBG_ERROR(glue->luaState, glue, errorMsg);
 OnUnrefExit:
-    LuaTimerClearCb(luaTimer);
+    GlueTimerClear(glue);
 }
 
-static void LuaAfbPcallFunc (void *context, int status, unsigned nreplies, afb_data_t const replies[]) {
+static void GluePcallFunc (void *context, int status, unsigned nreplies, afb_data_t const replies[]) {
     LuaAsyncCtxT *cbHandle= (LuaAsyncCtxT*) context;
     const char *errorMsg = NULL;
     int err, count;
-    LuaHandleT *luaHandle= cbHandle->handle;
+    AfbHandleT *glue= cbHandle->handle;
 
     // subcall was refused
     if (AFB_IS_BINDER_ERRNO(status)) {
@@ -100,60 +100,58 @@ static void LuaAfbPcallFunc (void *context, int status, unsigned nreplies, afb_d
         goto OnErrorExit;
     }
 
-    // define luafunc callback and add luahandle as 1st argument
-    lua_getglobal(luaHandle->luaState, cbHandle->luafunc);
-    lua_pushlightuserdata(luaHandle->luaState, luaHandle);
-    lua_pushlightuserdata(luaHandle->luaState, cbHandle->context);
-    lua_pushinteger (luaHandle->luaState, status);
+    // define luafunc callback and add glue as 1st argument
+    lua_getglobal(glue->luaState, cbHandle->luafunc);
+    lua_pushlightuserdata(glue->luaState, glue);
+    lua_pushinteger (glue->luaState, status);
+    lua_pushlightuserdata(glue->luaState, cbHandle->context);
 
     // retreive subcall response and build LUA response
-    errorMsg= LuaPushAfbReply (luaHandle->luaState, nreplies, replies, &count);
-    if (errorMsg) {
-        goto OnErrorExit;
-    }
+    errorMsg= LuaPushAfbReply (glue->luaState, nreplies, replies, &count);
+    if (errorMsg) goto OnErrorExit;
 
     // effectively exec LUA script code
-    err = lua_pcall(luaHandle->luaState, count+3, LUA_MULTRET, 0);
+    err = lua_pcall(glue->luaState, count+3, LUA_MULTRET, 0);
     if (err) {
         errorMsg= cbHandle->luafunc;
         goto OnErrorExit;
     }
 
-    // free afb request and luahandle
+    // free afb request and glue
     free (cbHandle->luafunc);
     free (cbHandle);
     return;
 
 OnErrorExit:
-    LUA_DBG_ERROR(luaHandle->luaState, luaHandle, errorMsg);
+    LUA_DBG_ERROR(glue->luaState, glue, errorMsg);
 }
 
-void LuaAfbApiSubcallCb (void *context, int status, unsigned nreplies, afb_data_t const replies[], afb_api_t api) {
-    LuaAfbPcallFunc (context, status, nreplies, replies);
+void GlueApiSubcallCb (void *context, int status, unsigned nreplies, afb_data_t const replies[], afb_api_t api) {
+    GluePcallFunc (context, status, nreplies, replies);
 }
 
-void LuaAfbRqtSubcallCb (void *context, int status, unsigned nreplies, afb_data_t const replies[], afb_req_t req) {
-    LuaAfbPcallFunc (context, status, nreplies, replies);
+void GlueRqtSubcallCb (void *context, int status, unsigned nreplies, afb_data_t const replies[], afb_req_t req) {
+    GluePcallFunc (context, status, nreplies, replies);
 }
 
-void LuaAfbEvtHandlerCb (void *context, const char *evtName, unsigned nparams, afb_data_x4_t const params[], afb_api_t api) {
-    LuaHandleT *luaHandler= (LuaHandleT*) context;
-    assert (luaHandler && luaHandler->magic==LUA_HANDLER_MAGIC);
+void GlueEvtHandlerCb (void *context, const char *evtName, unsigned nparams, afb_data_x4_t const params[], afb_api_t api) {
+    AfbHandleT *luaHandler= (AfbHandleT*) context;
+    assert (luaHandler && luaHandler->magic==GLUE_HANDLER_MAGIC);
     const char *errorMsg = NULL;
     lua_State *luaState= luaHandler->luaState;
     int err, count;
 
     // update statistic
-    luaHandler->lua.handler.count++;
+    luaHandler->handler.count++;
 
     // define luafunc callback and add luaHandler as 1st argument
-    lua_getglobal(luaState, luaHandler->lua.handler.callback);
+    lua_getglobal(luaState, luaHandler->handler.callback);
     lua_pushlightuserdata(luaState, luaHandler);
 
     // push event name
     lua_pushstring (luaState, evtName);
 
-    if (luaHandler->lua.handler.usrdata) lua_pushlightuserdata(luaState, luaHandler->lua.handler.usrdata);
+    if (luaHandler->handler.userdata) lua_pushlightuserdata(luaState, luaHandler->handler.userdata);
     else lua_pushnil(luaState);
 
     // retreive subcall response and build LUA response
@@ -165,7 +163,7 @@ void LuaAfbEvtHandlerCb (void *context, const char *evtName, unsigned nparams, a
     // effectively exec LUA script code
     err = lua_pcall(luaState, count+3, 0, 0);
     if (err) {
-        errorMsg= luaHandler->lua.handler.callback;
+        errorMsg= luaHandler->handler.callback;
         goto OnErrorExit;
     }
     return;
@@ -174,26 +172,27 @@ OnErrorExit:
     LUA_DBG_ERROR(luaState, luaHandler, errorMsg);
 }
 
-void AfbschedwaitCb (int signum, void *context, struct afb_sched_lock *afbLock) {
+void GlueSchedWaitCb (int signum, void *context, struct afb_sched_lock *afbLock) {
     const char *errorMsg = NULL;
-    LuaHandleT *luaLock= (LuaHandleT*)context;
+    AfbHandleT *luaLock= (AfbHandleT*)context;
+    assert (luaLock && luaLock->magic == GLUE_LOCK_MAGIC);
 
-    // define luafunc callback and add luahandle as 1st argument
+    // define luafunc callback and add glue as 1st argument
     int stack = lua_gettop(luaLock->luaState);
-    lua_getglobal(luaLock->luaState, luaLock->lua.lock.luafunc);
+    lua_getglobal(luaLock->luaState, luaLock->lock.luafunc);
     lua_State *luaState= luaLock->luaState;
     // create a fake API for waitCB
-    LuaHandleT luaApi;
-    luaApi.luaState= luaState;
-    luaApi.magic= LUA_API_MAGIC;
-    luaApi.lua.api.afb=luaLock->lua.lock.apiv4;
-    lua_pushlightuserdata(luaLock->luaState, &luaApi);
+    AfbHandleT glue;
+    glue.luaState= luaState;
+    glue.magic= GLUE_API_MAGIC;
+    glue.api.afb=luaLock->lock.apiv4;
+    lua_pushlightuserdata(luaLock->luaState, &glue);
 
     // complement luaLock handle with afblock
-    luaLock->lua.lock.afb= afbLock;
+    luaLock->lock.afb= afbLock;
     lua_pushlightuserdata(luaState, luaLock);
 
-    int err= LuaPushOneArg (luaState, luaLock->lua.lock.dataJ);
+    int err= LuaPushOneArg (luaState, luaLock->lock.dataJ);
     if (err) {
         errorMsg= "fail to push userdata";
         goto OnErrorExit;
@@ -201,14 +200,14 @@ void AfbschedwaitCb (int signum, void *context, struct afb_sched_lock *afbLock) 
     // effectively exec LUA script code
     err = lua_pcall(luaState, 3, LUA_MULTRET, 0);
     if (err) {
-        errorMsg= luaLock->lua.lock.luafunc;
+        errorMsg= luaLock->lock.luafunc;
         goto OnErrorExit;
     }
 
     int count = lua_gettop(luaState) - stack;
     if (count) {
         int isNum;
-        luaLock->lua.lock.status= (int) lua_tointegerx (luaLock->luaState, -1, &isNum);
+        luaLock->lock.status= (int) lua_tointegerx (luaLock->luaState, -1, &isNum);
         if (!isNum) {
             errorMsg = "waiton callback should return a status";
             goto OnErrorExit;
@@ -218,8 +217,39 @@ void AfbschedwaitCb (int signum, void *context, struct afb_sched_lock *afbLock) 
 
 OnErrorExit:
     LUA_DBG_ERROR(luaState, luaLock, errorMsg);
-    luaLock->lua.lock.status=-1;
+    luaLock->lock.status=-1;
     afb_sched_leave(afbLock);
+}
+
+void GlueSchedTimeoutCb (int signum, void *context) {
+    const char *errorMsg = NULL;
+    GlueHandleCbT *handle= (GlueHandleCbT*)context;
+    assert (handle && handle->magic == GLUE_SCHED_MAGIC);
+    lua_State *luaState= handle->glue->luaState;
+
+    // timer not cancel
+    if (signum != SIGABRT) {
+        // define luafunc callback and add glue as 1st argument
+        lua_getglobal(luaState, handle->callback);
+        lua_pushlightuserdata(luaState, handle->glue);
+        lua_pushlightuserdata(luaState, handle->userdata);
+
+        // effectively exec LUA script code
+        int err = lua_pcall(luaState, 2, LUA_MULTRET, 0);
+        if (err) {
+            errorMsg= handle->callback;
+            goto OnErrorExit;
+        }
+
+    }
+    free (handle->callback);
+    free (handle);
+    return;
+
+OnErrorExit:
+    LUA_DBG_ERROR(handle->glue->luaState, handle->glue, errorMsg);
+    free (handle->callback);
+    free (handle);
 }
 
 
@@ -227,21 +257,22 @@ static void LuaFreeJsonCtx (json_object *configJ, void *userdata) {
     free (userdata);
 }
 
-void LuaAfbVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
+
+void GlueVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
 {
     const char *errorMsg = NULL;
     int err, count;
     afb_data_t args[nparams];
     json_object *argsJ[nparams];
-    LuaHandleT *luaRqt = LuaRqtNew(afbRqt);
-    lua_State *luaState= luaRqt->luaState;
+    AfbHandleT *glue = GlueRqtNew(afbRqt);
+    lua_State *luaState= glue->luaState;
 
     // on first call we compile configJ to boost following lua api/verb calls
     json_object *configJ = afb_req_get_vcbdata(afbRqt);
     if (!configJ)
     {
         errorMsg = "fail get verb config";
-        LUA_AFB_ERROR(luaRqt, errorMsg);
+        GLUE_AFB_ERROR(glue, errorMsg);
         goto OnErrorExit;
     }
 
@@ -250,9 +281,9 @@ void LuaAfbVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
     {
         luaVcData = calloc(1, sizeof(luaVerbDataT));
         json_object_set_userdata(configJ, luaVcData, LuaFreeJsonCtx);
-        luaVcData->magic = LUA_VCDATA_MAGIC;
+        luaVcData->magic = GLUE_VCDATA_MAGIC;
 
-        err = wrap_json_unpack(configJ, "{ss ss s?s}", "verb", &luaVcData->verb, "func", &luaVcData->func, "info", &luaVcData->info);
+        err = wrap_json_unpack(configJ, "{ss ss s?s}", "verb", &luaVcData->verb, "callback", &luaVcData->func, "info", &luaVcData->info);
         if (err)
         {
             errorMsg = "invalid verb json config";
@@ -261,13 +292,13 @@ void LuaAfbVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
     }
     else
     {
-        if (luaVcData->magic != LUA_VCDATA_MAGIC)
+        if (luaVcData->magic != GLUE_VCDATA_MAGIC)
         {
             errorMsg = "fail to converting json to LUA table";
             goto OnErrorExit;
         }
     }
-    luaRqt->lua.rqt.vcData = luaVcData;
+    glue->rqt.vcData = luaVcData;
 
     // retreive input arguments and convert them to json
     for (int idx = 0; idx < nparams; idx++)
@@ -284,7 +315,7 @@ void LuaAfbVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
     // define lua api/verb function
     int stack = lua_gettop(luaState);
     lua_getglobal(luaState, luaVcData->func);
-    lua_pushlightuserdata(luaState, luaRqt);
+    lua_pushlightuserdata(luaState, glue);
 
     // push query list argument to lua func
     for (count = 0; count < nparams; count++)
@@ -301,7 +332,7 @@ void LuaAfbVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
     err = lua_pcall(luaState, count + 1, LUA_MULTRET, 0);
     if (err)
     {
-        LUA_DBG_ERROR(luaState, luaRqt, "LuaAfbVerbCb");
+        LUA_DBG_ERROR(luaState, glue, "GlueVerbCb");
         goto OnErrorExit;
     }
     else
@@ -331,7 +362,7 @@ void LuaAfbVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
                 afb_create_data_raw(&reply[index++], AFB_PREDEFINED_TYPE_JSON_C, responseJ, 0, (void *)json_object_put, responseJ);
             }
             // afb response should be provided by lua api/verb function
-            LuaAfbReply(luaRqt, status, index, reply);
+            GlueReply(glue, status, index, reply);
         }
     }
 
@@ -341,25 +372,25 @@ OnErrorExit:
     {
         afb_data_t reply;
         json_object *errorJ = LuaJsonDbg(luaState, errorMsg);
-        LUA_AFB_WARNING(luaRqt, "LuaAfbVerbCb: api=[%s] verb=[%s] error=%s", afb_api_name(afb_req_get_api(afbRqt)), afb_req_get_called_verb(afbRqt), errorMsg);
+        GLUE_AFB_WARNING(glue, "verb=[%s] lua=%s", afb_req_get_called_verb(afbRqt), json_object_get_string(errorJ));
         afb_create_data_raw(&reply, AFB_PREDEFINED_TYPE_JSON_C, errorJ, 0, (void *)json_object_put, errorJ);
-        LuaAfbReply(luaRqt, -1, 1, &reply);
+        GlueReply(glue, -1, 1, &reply);
     }
 }
 
 // automatic generation of api/info introspection verb
-void LuaAfbInfoCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
+void GlueInfoCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
 {
     afb_api_t apiv4 = afb_req_get_api(afbRqt);
     afb_data_t reply;
 
     // retreive interpreteur from API
-    LuaHandleT *luaApi = afb_api_get_userdata(apiv4);
-    assert(luaApi->magic == LUA_API_MAGIC);
+    AfbHandleT *glue = afb_api_get_userdata(apiv4);
+    assert(glue->magic == GLUE_API_MAGIC);
 
     // extract uid + info from API config
     json_object *uidJ, *infoJ=NULL, *metaJ;
-    wrap_json_unpack (luaApi->lua.api.configJ, "{so s?o}"
+    wrap_json_unpack (glue->api.configJ, "{so s?o}"
         ,"uid", &uidJ
         ,"info", &infoJ
     );
@@ -374,7 +405,7 @@ void LuaAfbInfoCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
     {
         const afb_verb_t *afbVerb = afb_api_v4_verb_at(apiv4, idx);
         if (!afbVerb) break;
-        if (afbVerb->vcbdata != luaApi) {
+        if (afbVerb->vcbdata != glue) {
             json_object_array_add(verbsJ, (json_object *)afbVerb->vcbdata);
             json_object_get(verbsJ);
         }
@@ -390,21 +421,20 @@ void LuaAfbInfoCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
 }
 
 // this routine execute within mainloop context when binder is ready to go
-int LuaAfbStartupCb(json_object *configJ, void *context)
+int GlueStartupCb(void* callback, void *context)
 {
-    const char *startup;
-    LuaHandleT *binder = (LuaHandleT *)context;
+    const char *funcname= (char*) callback;
+    AfbHandleT *binder = (AfbHandleT *)context;
     int err, count;
 
-    assert(binder && binder->magic == LUA_BINDER_MAGIC);
+    assert(binder && binder->magic == GLUE_BINDER_MAGIC);
 
-    startup = json_object_get_string(configJ);
-    if (startup)
+    if (callback)
     {
         int stack = lua_gettop(binder->luaState);
 
         // call lua startup
-        lua_getglobal(binder->luaState, startup);
+        lua_getglobal(binder->luaState, funcname);
 
         // push lua request handle
         lua_pushlightuserdata(binder->luaState, binder);
@@ -426,14 +456,14 @@ OnErrorExit:
     return -1;
 }
 
-int LuaApiCtrlCb(afb_api_t apiv4, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *context) {
-    LuaHandleT *luaApi= (LuaHandleT*) context;
+int GlueCtrlCb(afb_api_t apiv4, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *context) {
+    AfbHandleT *glue= (AfbHandleT*) context;
     static int orphan=0;
     const char *state;
     int err=0;
 
     // assert context validity
-    assert (luaApi && luaApi->magic == LUA_API_MAGIC);
+    assert (glue && glue->magic == GLUE_API_MAGIC);
 
 
     switch (ctlid) {
@@ -443,10 +473,10 @@ int LuaApiCtrlCb(afb_api_t apiv4, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *
 
     case afb_ctlid_Pre_Init:
         state="config";
-        luaApi->lua.api.afb= apiv4;
+        glue->api.afb= apiv4;
 
         // extract lua api control function callback
-        luaApi->lua.api.ctrlCb= json_object_get_string(json_object_object_get(luaApi->lua.api.configJ, "control"));
+        glue->api.ctrlCb= json_object_get_string(json_object_object_get(glue->api.configJ, "control"));
         break;
 
     case afb_ctlid_Init:
@@ -458,7 +488,7 @@ int LuaApiCtrlCb(afb_api_t apiv4, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *
         break;
 
     case afb_ctlid_Orphan_Event:
-        LUA_AFB_WARNING (luaApi, "Orphan event=%s count=%d", ctlarg->orphan_event.name, orphan++);
+        GLUE_AFB_WARNING (glue, "Orphan event=%s count=%d", ctlarg->orphan_event.name, orphan++);
         state="orphan";
         break;
 
@@ -470,28 +500,28 @@ int LuaApiCtrlCb(afb_api_t apiv4, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *
         break;
     }
 
-    if (!luaApi->lua.api.ctrlCb) {
-        LUA_AFB_WARNING(luaApi,"LuaApiCtrlCb: No init callback state=[%s]", state);
+    if (!glue->api.ctrlCb) {
+        GLUE_AFB_WARNING(glue,"GlueCtrlCb: No init callback state=[%s]", state);
 
     } else {
         // define lua api/verb function and argument
-        int stack = lua_gettop(luaApi->luaState);
-        lua_getglobal(luaApi->luaState, luaApi->lua.api.ctrlCb);
-        lua_pushlightuserdata (luaApi->luaState, luaApi);
-        lua_pushstring(luaApi->luaState, state);
+        int stack = lua_gettop(glue->luaState);
+        lua_getglobal(glue->luaState, glue->api.ctrlCb);
+        lua_pushlightuserdata (glue->luaState, glue);
+        lua_pushstring(glue->luaState, state);
 
         // effectively exec LUA script code
-        LUA_AFB_NOTICE(luaApi,"LuaApiCtrlCb: func=[%s] state=[%s]", luaApi->lua.api.ctrlCb, state);
-        err = lua_pcall(luaApi->luaState, 2, LUA_MULTRET, 0);
+        GLUE_AFB_NOTICE(glue,"GlueCtrlCb: func=[%s] state=[%s]", glue->api.ctrlCb, state);
+        err = lua_pcall(glue->luaState, 2, LUA_MULTRET, 0);
         if (err) goto OnErrorExit;
 
         // check number of returned arguments
-        int argc= lua_gettop(luaApi->luaState) - stack;
-        if (argc) err= (int)lua_tointeger(luaApi->luaState, -1);
+        int argc= lua_gettop(glue->luaState) - stack;
+        if (argc) err= (int)lua_tointeger(glue->luaState, -1);
     }
     return err;
 
 OnErrorExit:
-    LUA_DBG_ERROR(luaApi->luaState, luaApi, luaApi->lua.api.ctrlCb);
+    LUA_DBG_ERROR(glue->luaState, glue, glue->api.ctrlCb);
     return -1;
 }

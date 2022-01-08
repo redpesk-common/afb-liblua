@@ -29,19 +29,20 @@
 #include "lua-utils.h"
 
 typedef struct {
-    LuaHandleT  *handle;
+    AfbHandleT  *handle;
     char *luafunc;
     void *context;
 } LuaAsyncCtxT;
 
-void LuaAfbEvtHandlerCb(void *context, const char *event_name,	unsigned nparams, afb_data_x4_t const params[],	afb_api_t api);
-void LuaAfbApiSubcallCb(void *context, int status, unsigned nreplies, afb_data_t const replies[], afb_api_t api);
-void LuaAfbRqtSubcallCb(void *context, int status, unsigned nreplies, afb_data_t const replies[], afb_req_t req);
-int  LuaApiCtrlCb(afb_api_t apiv4, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *context);
-void LuaAfbVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[]);
-void LuaAfbInfoCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[]);
-void LuaTimerCb (afb_timer_x4_t timer, void *context, int decount);
-int LuaAfbStartupCb(json_object *configJ, void *context);
-void LuaTimerClearCb(LuaHandleT *luaTimer);
+void GlueEvtHandlerCb(void *context, const char *event_name,	unsigned nparams, afb_data_x4_t const params[],	afb_api_t api);
+void GlueApiSubcallCb(void *context, int status, unsigned nreplies, afb_data_t const replies[], afb_api_t api);
+void GlueRqtSubcallCb(void *context, int status, unsigned nreplies, afb_data_t const replies[], afb_req_t req);
+int  GlueCtrlCb(afb_api_t apiv4, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *context);
+void GlueVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[]);
+void GlueInfoCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[]);
+void GlueTimerCb (afb_timer_x4_t timer, void *context, int decount);
+int GlueStartupCb(void *callback, void *context);
+void GlueTimerClear(AfbHandleT *glue);
 
-void AfbschedwaitCb (int signum, void *context, struct afb_sched_lock *afbLock);
+void GlueSchedTimeoutCb (int signum, void *context);
+void GlueSchedWaitCb (int signum, void *context, struct afb_sched_lock *afbLock);

@@ -53,17 +53,16 @@ function resetLoaCB(rqt, query)
 end
 
 function checkLoaCB(rqt, query)
-    libafb.notice  (rqt, "Protected API sesssion uuid=%s", libafb.clientinfo(rqt, 'uuid'))
+    libafb.notice  (rqt, "Protected API session uuid=%s", libafb.clientinfo(rqt, 'uuid'))
     return 0
 end
 
-
 -- api verb list
 local loaVerbs = {
-    {uid='lua-ping' , verb='ping'  , func='pingCB'    ,auth= 'anonymous', info='lua ping loa function'},
-    {uid='lua-set'  , verb='set'   , func='setLoaCB'  ,auth= 'anonymous', info='set LOA to 1'},
-    {uid='lua-reset', verb='reset' , func='resetLoaCB',auth= 'anonymous', info='reset LOA to 0'},
-    {uid='lua-check', verb='check' , func='checkLoaCB',auth= 'autorized', info='protected API requiere LOA>=1'},
+    {uid='lua-ping' , verb='ping'  , callback='pingCB'    ,auth= 'anonymous', info='lua ping loa function'},
+    {uid='lua-set'  , verb='set'   , callback='setLoaCB'  ,auth= 'anonymous', info='set LOA to 1'},
+    {uid='lua-reset', verb='reset' , callback='resetLoaCB',auth= 'anonymous', info='reset LOA to 0'},
+    {uid='lua-check', verb='check' , callback='checkLoaCB',auth= 'autorized', info='protected API requiere LOA>=1'},
 }
 
 -- define permissions
@@ -80,7 +79,7 @@ local loaAlcs = {
 local loaApi = {
     uid     = 'lua-loa',
     api     = 'loa',
-    class   = 'test',
+    provide   = 'test',
     info    = 'lua api loa',
     verbose = 9,
     export  = 'public',
@@ -108,7 +107,7 @@ end
 -- create and start binder
 libafb.luastrict(true)
 local binder= libafb.binder(loaOpts)
-local luaApi= libafb.apiadd(loaApi)
+local glue= libafb.apiadd(loaApi)
 
 -- should never return
 local status= libafb.mainloop('loopBinderCb')

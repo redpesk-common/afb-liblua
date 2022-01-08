@@ -25,30 +25,30 @@
 #include <json-c/json.h>
 #include "lua-afb.h"
 
-void LuaAfbVerbose (LuaHandleT *luaState, int level, const char *file, int line, const char *func, const char *fmt, ...);
-#define LUA_AFB_INFO(luaHandle,...)    LuaAfbVerbose (luaHandle,AFB_SYSLOG_LEVEL_INFO,__file__,__LINE__,__func__,__VA_ARGS__)
-#define LUA_AFB_NOTICE(luaHandle,...)  LuaAfbVerbose (luaHandle,AFB_SYSLOG_LEVEL_NOTICE,__file__,__LINE__,__func__,__VA_ARGS__)
-#define LUA_AFB_WARNING(luaHandle,...) LuaAfbVerbose (luaHandle,AFB_SYSLOG_LEVEL_WARNING,__file__,__LINE__,__func__,__VA_ARGS__)
-#define LUA_AFB_ERROR(luaHandle,...)   LuaAfbVerbose (luaHandle,AFB_SYSLOG_LEVEL_ERROR,__file__,__LINE__,__func__,__VA_ARGS__)
-#define LUA_DBG_ERROR(luaState,luaHandle,...)   LuaInfoDbg    (luaState, luaHandle, AFB_SYSLOG_LEVEL_ERROR, __func__, __VA_ARGS__);
+void GlueVerbose (AfbHandleT *luaState, int level, const char *file, int line, const char *func, const char *fmt, ...);
+#define GLUE_AFB_INFO(glue,...)    GlueVerbose (glue,AFB_SYSLOG_LEVEL_INFO,__file__,__LINE__,__func__,__VA_ARGS__)
+#define GLUE_AFB_NOTICE(glue,...)  GlueVerbose (glue,AFB_SYSLOG_LEVEL_NOTICE,__file__,__LINE__,__func__,__VA_ARGS__)
+#define GLUE_AFB_WARNING(glue,...) GlueVerbose (glue,AFB_SYSLOG_LEVEL_WARNING,__file__,__LINE__,__func__,__VA_ARGS__)
+#define GLUE_AFB_ERROR(glue,...)   GlueVerbose (glue,AFB_SYSLOG_LEVEL_ERROR,__file__,__LINE__,__func__,__VA_ARGS__)
+#define LUA_DBG_ERROR(luaState,glue,...)   LuaInfoDbg (luaState, glue, AFB_SYSLOG_LEVEL_ERROR, __func__, __VA_ARGS__);
 
-afb_api_t LuaAfbGetApi(LuaHandleT*luaHandle);
 
-void LuaInfoDbg (lua_State* luaState, LuaHandleT *luaHandle, int level, const char *func, const char *message);
+void LuaInfoDbg (lua_State* luaState, AfbHandleT *glue, int level, const char *func, const char *message);
 int LuaPrintMsg(lua_State *luaState, int level);
 json_object *LuaJsonDbg (lua_State *luaState, const char *message);
 
-LuaHandleT *LuaRqtNew(afb_req_t afbRqt);
-void LuaRqtAddref(LuaHandleT *luaRqt);
-void LuaRqtUnref(LuaHandleT *luaRqt);
-int LuaAfbReply (LuaHandleT *luaRqt, int status, int nbreply, afb_data_t *reply);
+afb_api_t GlueGetApi(AfbHandleT*glue);
+AfbHandleT *GlueRqtNew(afb_req_t afbRqt);
+void GlueRqtAddref(AfbHandleT *glue);
+void GlueRqtUnref(AfbHandleT *glue);
+int GlueReply (AfbHandleT *glue, int status, int nbreply, afb_data_t *reply);
 
-LuaHandleT *LuaRqtPop(lua_State *luaState, int index);
-LuaHandleT* LuaEventPop (lua_State* luaState, int index);
-LuaHandleT* LuaApiPop (lua_State* luaState, int index);
-LuaHandleT *LuaTimerPop(lua_State *luaState, int index);
-LuaHandleT *LuaLockPop(lua_State *luaState, int index);
-LuaHandleT *LuaBinderPop(lua_State *luaState);
+AfbHandleT* LuaEventPop (lua_State* luaState, int index);
+AfbHandleT* LuaApiPop (lua_State* luaState, int index);
+AfbHandleT *LuaTimerPop(lua_State *luaState, int index);
+AfbHandleT *LuaRqtPop(lua_State *luaState, int index);
+AfbHandleT *LuaLockPop(lua_State *luaState, int index);
+AfbHandleT *LuaBinderPop(lua_State *luaState);
 
 json_object *LuaTableToJson(lua_State *luaState, int index);
 json_object *LuaPopArgs(lua_State *luaState, int start);

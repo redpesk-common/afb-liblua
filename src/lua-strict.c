@@ -46,7 +46,7 @@ static const char *luaAddons = "\n\
 ";
 
 
-int LuaAfbStrict(lua_State *luaState)
+int GlueStrict(lua_State *luaState)
 {
 
     int doit= lua_toboolean(luaState, LUA_FIRST_ARG);

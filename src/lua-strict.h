@@ -23,4 +23,4 @@
  */
 
 #include <lua.h>
-int LuaAfbStrict(lua_State *luaState);
+int GlueStrict(lua_State *luaState);
