@@ -1062,7 +1062,7 @@ static const luaL_Reg afbFunction[] = {
     {"warning", LuaPrintWarning},
     {"debug", LuaPrintDebug},
     {"error", LuaPrintError},
-    {"respond", GlueRespond},
+    {"reply", GlueRespond},
     {"exit", GlueExit},
     {"evtsubscribe", GlueEventSubscribe},
     {"evtunsubscribe", GlueEventUnsubscribe},

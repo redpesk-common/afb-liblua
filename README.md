@@ -31,6 +31,23 @@ Make sure that your dependencies are reachable from lua scripting engine, before
     lua samples/test-api.lua
 ```
 
+## Debug from codium
+
+Codium does not include GDP profile by default you should get them from Ms-Code repository
+
+Go to code market place and download a version compatible with your editor version
+
+* https://github.com/microsoft/vscode-cpptools/releases
+* https://marketplace.visualstudio.com/items?itemName=yinfei.luahelper (download-extention)
+
+Install your extention
+
+* codium --install-extension cpptools-linux.vsix
+* codium --install-extension yinfei.luahelper-0.2.10.vsix 
+
+NOTE: I fail to use LUA vscode debugger (any input would be more than wellcome)
+WARNING: the lastest version is probably not compatible with your codium version.
+
 ## Import afb-luaglue
 
 Your lua script should import afb-luaglue. require return a table which contains the c-module api.
@@ -87,7 +104,7 @@ Expose a new api with ```libafb.apiadd(demoApi)``` as in following example.
 function pingCB(rqt)
     count= count+1
     libafb.notice  (rqt, "pingCB count=%d", count)
-    libafb.respond (rqt, 0, {'pong', count})
+    libafb.reply (rqt, 0, {'pong', count})
     --return 0, {"pong", count} --implicit response
 end
 
@@ -117,11 +134,11 @@ local glue= libafb.apiadd(demoApi)
 
 Both synchronous and asynchronous call are supported. The fact the subcall is done from a request or from a api context is abstracted to the user. When doing it from RQT context client security context is not propagated and remove event are claimed by the lua api.
 
-Explicit response to a request is done with ``` libafb.respond(rqt,status,arg1,..,argn)```. When running a synchronous request an implicit response may also be done with ```return(status, arg1,...,arg-n)```. Note that with afb-v4 an application may return zero, one or many data.
+Explicit response to a request is done with ``` libafb.reply(rqt,status,arg1,..,argn)```. When running a synchronous request an implicit response may also be done with ```return(status, arg1,...,arg-n)```. Note that with afb-v4 an application may return zero, one or many data.
 
 ```lua
 Function asyncRespCB(rqt, ctx, status, response)
-    libafb.respond (rqt, status, 'async helloworld/testargs', response)
+    libafb.reply (rqt, status, 'async helloworld/testargs', response)
 end
 
 function syncCB(rqt, query)
@@ -130,12 +147,12 @@ function syncCB(rqt, query)
         , query
     )
     if (status ~= 0) then
-        libafb.respond (rqt
+        libafb.reply (rqt
             , status
             , 'async helloworld/testargs fail'
         )
     else
-        libafb.respond (rqt
+        libafb.reply (rqt
             , status
             , 'async helloworld/testargs success'
         )

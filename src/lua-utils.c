@@ -195,9 +195,9 @@ AfbHandleT *GlueRqtNew(afb_req_t afbRqt)
 // reply afb request only once and unref lua handle
 int GlueReply(AfbHandleT *glue, int status, int nbreply, afb_data_t *reply)
 {
-    if (glue->rqt.responded) goto OnErrorExit;
+    if (glue->rqt.replied) goto OnErrorExit;
     afb_req_reply(glue->rqt.afb, status, nbreply, reply);
-    glue->rqt.responded = 1;
+    glue->rqt.replied = 1;
     return 0;
 
 OnErrorExit:

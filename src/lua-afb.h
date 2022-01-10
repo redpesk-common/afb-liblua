@@ -79,7 +79,7 @@ struct LuaApiHandleS {
 struct LuaRqtHandleS {
     struct LuaApiHandleS *api;
     luaVerbDataT  *vcData;
-    int responded;
+    int replied;
     afb_req_t afb;
 };
 

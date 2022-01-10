@@ -30,13 +30,13 @@ local count= 0
 function pingCB(rqt)
     count= count+1
     libafb.notice  (rqt, "pingCB count=%d", count)
-    libafb.respond (rqt, 0, {'pong', count})
+    libafb.reply (rqt, 0, {'pong', count})
     --return 0, {"pong", count} --implicit response
 end
 
 function argsCB(rqt, query)
     libafb.notice  (rqt, "actionCB query=%s", query)
-    libafb.respond (rqt, 0, {'query', query})
+    libafb.reply (rqt, 0, {'query', query})
 end
 
 -- api verb list

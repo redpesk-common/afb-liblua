@@ -32,13 +32,13 @@ local count= 0
 function pingCB(rqt)
     count= count+1
     libafb.notice  (rqt, "pingCB count=%d", count)
-    libafb.respond (rqt, 0, {'pong', count})
+    libafb.reply (rqt, 0, {'pong', count})
     --return 0, {"pong", count} --implicit response
 end
 
 function asyncRespCB(rqt, status, ctx, response)
     libafb.notice  (rqt, "asyncRespCB status=%d ctx='%s', response='%s'", status, libafb.serialize(ctx), response)
-    libafb.respond (rqt, status, 'async helloworld/testargs', response)
+    libafb.reply (rqt, status, 'async helloworld/testargs', response)
 end
 
 function syncCB(rqt, query)
@@ -47,9 +47,9 @@ function syncCB(rqt, query)
     local status,response= libafb.callsync(rqt, "helloworld","testargs", query)
 
     if (status ~= 0) then
-        libafb.respond (rqt, status, 'async helloworld/testargs fail')
+        libafb.reply (rqt, status, 'async helloworld/testargs fail')
     else
-        libafb.respond (rqt, status, 'async helloworld/testargs success')
+        libafb.reply (rqt, status, 'async helloworld/testargs success')
     end
 end
 
