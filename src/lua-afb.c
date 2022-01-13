@@ -516,8 +516,8 @@ static int GlueSchedWait(lua_State *luaState)
     luaLock->lock.dataJ= (void*) LuaPopOneArg(luaState, LUA_FIRST_ARG + 2);
 
     err= afb_sched_enter(NULL, timeout, GlueSchedWaitCb, luaLock);
-    if (err) {
-        errorMsg= "fail to register afb_sched_enter";
+    if (err < 0) {
+        errorMsg= "afb_sched_enter (timeout?)";
         goto OnErrorExit;
     }
 
@@ -627,7 +627,7 @@ static int GlueSchedUnlock(lua_State *luaState)
 
     err= afb_sched_leave(luaLock->lock.afb);
     if (err) {
-        errorMsg= "fail to register afb_sched_enter";
+        errorMsg= "afb_sched_leave (invalid lock)";
         goto OnErrorExit;
     }
 

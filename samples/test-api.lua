@@ -67,7 +67,7 @@ end
 -- executed when binder and all api/interfaces are ready to serv
 function startTestCB(binder)
     local status=0
-    local timeout=5 -- seconds
+    local timeout=7 -- seconds
     libafb.notice(binder, "startTestCB=[%s]", libafb.config(binder, "uid"))
 
     -- implement here after your startup/testing code
@@ -83,6 +83,7 @@ function startTestCB(binder)
 
     ::done::
     libafb.notice (binder, "test done status=%d", status)
+    status=-1 -- force binder exit
 
     -- libafb.exit(binder, status) force binder exit from anywhere
     return(status) -- negative status force mainloop exit
