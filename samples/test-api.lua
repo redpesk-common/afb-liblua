@@ -9,8 +9,8 @@ object:
     - imports helloworld-event binding and api
     - call helloworld-event/startTimer to activate binding timer (1 event per second)
     - call helloworld-event/subscribe to subscribe to event
-    - lock mainloop with SchedwaitCB and register the eventHandler (EventReceiveCB) with mainloop lock
-    - finally (EventReceiveCB) count 5 events and release the mainloop lock received from SchedwaitCB
+    - lock mainloop with aSyncEventTest and register the eventHandler (EventReceiveCB) with mainloop lock
+    - finally (EventReceiveCB) count 5 events and release the mainloop lock received from aSyncEventTest
 
 usage
     - from dev tree: LD_LIBRARY_PATH=../afb-libglue/build/src/ lua samples/test-api.lua
@@ -39,14 +39,14 @@ function EventReceiveCB(evt, name, lock, data)
     end
 end
 
-function SchedwaitCB(api, lock, context)
+function aSyncEventTest(api, lock, context)
     evtCount=0
     libafb.notice (api, "Schedlock timer-event handler register")
     libafb.evthandler(api, {uid='timer-event', pattern='helloworld-event/timerCount',callback='EventReceiveCB'}, lock)
     return 0
 end
 
-function EventSubscribe(binder)
+function syncEventTest(binder)
     libafb.notice (binder, "helloworld-event", "startTimer")
     local status= libafb.callsync(binder, "helloworld-event", "subscribe")
     if (status ~= 0) then
@@ -55,7 +55,7 @@ function EventSubscribe(binder)
     return status
 end
 
-function StartEventTimer(binder)
+function syncTimerTest(binder)
     libafb.notice (binder, "helloworld-event/startTimer")
     local status= libafb.callsync(binder, "helloworld-event", "startTimer")
     if (status ~= 0) then
@@ -71,19 +71,18 @@ function startTestCB(binder)
     libafb.notice(binder, "startTestCB=[%s]", libafb.config(binder, "uid"))
 
     -- implement here after your startup/testing code
-    status= StartEventTimer(binder)
+    status= syncTimerTest(binder)
     if (status ~=0) then goto done end
 
-    status= EventSubscribe(binder)
+    status= syncEventTest(binder)
     if (status ~=0) then goto done end
 
     libafb.notice (binder, "waiting (%ds) for test to finish", timeout)
-    status= libafb.schedwait(binder, timeout, 'SchedwaitCB', nil)
+    status= libafb.schedwait(binder, timeout, 'aSyncEventTest', nil)
     if (status < 0) then goto done end
 
     ::done::
     libafb.notice (binder, "test done status=%d", status)
-    status=-1 -- force binder exit
 
     -- libafb.exit(binder, status) force binder exit from anywhere
     return(status) -- negative status force mainloop exit

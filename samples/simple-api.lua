@@ -75,7 +75,7 @@ end
 -- create and start binder
 libafb.luastrict(true)
 local binder= libafb.binder(demoOpts)
-local glue= libafb.apiadd(demoApi)
+local myapi= libafb.apiadd(demoApi)
 
 -- should never return
 local status= libafb.mainloop('loopBinderCb')

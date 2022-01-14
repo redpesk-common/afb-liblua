@@ -134,24 +134,43 @@ void GlueRqtSubcallCb (void *context, int status, unsigned nreplies, afb_data_t 
     GluePcallFunc (context, status, nreplies, replies);
 }
 
-void GlueEvtHandlerCb (void *context, const char *evtName, unsigned nparams, afb_data_x4_t const params[], afb_api_t api) {
-    AfbHandleT *luaHandler= (AfbHandleT*) context;
-    assert (luaHandler && luaHandler->magic==GLUE_HANDLER_MAGIC);
+void GlueEvtHandlerCb (void *userdata, const char *evtName, unsigned nparams, afb_data_x4_t const params[], afb_api_t api) {
     const char *errorMsg = NULL;
-    lua_State *luaState= luaHandler->luaState;
     int err, count;
 
-    // update statistic
-    luaHandler->handler.count++;
+    AfbHandleT *glue= (AfbHandleT*) afb_api_get_userdata(api);
+    assert (glue);
+
+    // on first call we compile configJ to boost following py api/verb calls
+    AfbVcbDataT *vcbData= userdata;
+    if (vcbData->magic != (void*)AfbAddVerbs) {
+        errorMsg = "(hoops) event invalid vcbData handle";
+        goto OnErrorExit;
+    }
+
+    // retreive lua interpretor from handler handle
+    if (!vcbData->state) vcbData->state= glue->luaState;
+    lua_State *luaState= (lua_State*)vcbData->state;
+
+    // on first call we need to retreive original callback object from configJ
+    if (!vcbData->callback)
+    {
+        json_object *funcJ=json_object_object_get(vcbData->configJ, "callback");
+        if (!funcJ) {
+            errorMsg = "(hoops) not callback defined";
+            goto OnErrorExit;
+        }
+        vcbData->callback= (void*)json_object_get_string(funcJ);
+    }
 
     // define luafunc callback and add luaHandler as 1st argument
-    lua_getglobal(luaState, luaHandler->handler.callback);
-    lua_pushlightuserdata(luaState, luaHandler);
+    lua_getglobal(luaState, (char*)vcbData->callback);
+    lua_pushlightuserdata(luaState, glue);
 
     // push event name
     lua_pushstring (luaState, evtName);
 
-    if (luaHandler->handler.userdata) lua_pushlightuserdata(luaState, luaHandler->handler.userdata);
+    if (vcbData->userdata) lua_pushlightuserdata(luaState, vcbData->userdata);
     else lua_pushnil(luaState);
 
     // retreive subcall response and build LUA response
@@ -163,13 +182,13 @@ void GlueEvtHandlerCb (void *context, const char *evtName, unsigned nparams, afb
     // effectively exec LUA script code
     err = lua_pcall(luaState, count+3, 0, 0);
     if (err) {
-        errorMsg= luaHandler->handler.callback;
+        errorMsg= (char*)vcbData->callback;
         goto OnErrorExit;
     }
     return;
 
 OnErrorExit:
-    LUA_DBG_ERROR(luaState, luaHandler, errorMsg);
+    LUA_DBG_ERROR(luaState, glue, errorMsg);
 }
 
 void GlueSchedWaitCb (int signum, void *context, struct afb_sched_lock *afbLock) {
@@ -252,12 +271,6 @@ OnErrorExit:
     free (handle);
 }
 
-
-static void LuaFreeJsonCtx (json_object *configJ, void *userdata) {
-    free (userdata);
-}
-
-
 void GlueVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
 {
     const char *errorMsg = NULL;
@@ -267,38 +280,24 @@ void GlueVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
     AfbHandleT *glue = GlueRqtNew(afbRqt);
     lua_State *luaState= glue->luaState;
 
-    // on first call we compile configJ to boost following lua api/verb calls
-    json_object *configJ = afb_req_get_vcbdata(afbRqt);
-    if (!configJ)
-    {
-        errorMsg = "fail get verb config";
-        GLUE_AFB_ERROR(glue, errorMsg);
+    // on first call we compile configJ to boost following py api/verb calls
+    AfbVcbDataT *vcbData= afb_req_get_vcbdata(afbRqt);
+    if (vcbData->magic != (void*)AfbAddVerbs) {
+        errorMsg = "(hoops) invalid vcbData handle";
         goto OnErrorExit;
     }
 
-    luaVerbDataT *luaVcData = json_object_get_userdata(configJ);
-    if (!luaVcData)
+    // on first call we need to retreive original callback object from configJ
+    if (!vcbData->callback)
     {
-        luaVcData = calloc(1, sizeof(luaVerbDataT));
-        json_object_set_userdata(configJ, luaVcData, LuaFreeJsonCtx);
-        luaVcData->magic = GLUE_VCDATA_MAGIC;
-
-        err = wrap_json_unpack(configJ, "{ss ss s?s}", "verb", &luaVcData->verb, "callback", &luaVcData->func, "info", &luaVcData->info);
-        if (err)
-        {
-            errorMsg = "invalid verb json config";
+        json_object *funcJ=json_object_object_get(vcbData->configJ, "callback");
+        if (!funcJ) {
+            errorMsg = "(hoops) not callback defined";
             goto OnErrorExit;
         }
+        vcbData->callback= (void*)json_object_get_string(funcJ);
     }
-    else
-    {
-        if (luaVcData->magic != GLUE_VCDATA_MAGIC)
-        {
-            errorMsg = "fail to converting json to LUA table";
-            goto OnErrorExit;
-        }
-    }
-    glue->rqt.vcData = luaVcData;
+    glue->rqt.vcbData = vcbData;
 
     // retreive input arguments and convert them to json
     for (int idx = 0; idx < nparams; idx++)
@@ -314,7 +313,7 @@ void GlueVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
 
     // define lua api/verb function
     int stack = lua_gettop(luaState);
-    lua_getglobal(luaState, luaVcData->func);
+    lua_getglobal(luaState, (char*)vcbData->callback);
     lua_pushlightuserdata(luaState, glue);
 
     // push query list argument to lua func
@@ -406,7 +405,9 @@ void GlueInfoCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
         const afb_verb_t *afbVerb = afb_api_v4_verb_at(apiv4, idx);
         if (!afbVerb) break;
         if (afbVerb->vcbdata != glue) {
-            json_object_array_add(verbsJ, (json_object *)afbVerb->vcbdata);
+            AfbVcbDataT *vcbData= afbVerb->vcbdata;
+            if (vcbData->magic != AfbAddVerbs) continue;
+            json_object_array_add(verbsJ, vcbData->configJ);
             json_object_get(verbsJ);
         }
     }

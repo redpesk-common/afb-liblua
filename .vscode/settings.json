@@ -8,6 +8,8 @@
         "afb-data.h": "c",
         "afb-apiset.h": "c",
         "afb-sys.h": "c",
-        "verbose.h": "c"
+        "verbose.h": "c",
+        "type_traits": "c",
+        "limits": "c"
     }
 }

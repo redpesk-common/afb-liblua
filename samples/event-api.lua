@@ -94,13 +94,6 @@ function unsubscribeCB(rqt)
     return 0 -- implicit respond
 end
 
-function evtTimerCB (api, name, data)
-    libafb.notice  (rqt, "evtTimerCB name=%s data=%s", name, data)
-end
-
-function evtOtherCB (api, name, data)
-    libafb.notice  (rqt, "evtOtherCB name=%s data=%s", name, data)
-end
 
 -- api verb list
 local apiVerbs = {
@@ -109,13 +102,8 @@ local apiVerbs = {
     {uid='lua-unsubscribe', verb='unsubscribe', callback='unsubscribeCB', info='unsubscribe to event'},
 }
 
-local apiEvents = {
-    {uid='lua-event' , pattern='lua-event', callback='evtTimerCB' , info='timer event handler'},
-    {uid='lua-other' , pattern='*', callback='evtOtherCB' , info='any other event handler'},
-}
-
 -- define and instanciate API
-local glue = {
+local myapi = {
     uid     = 'lua-event',
     info    = 'lua api event demonstration',
     api     = 'event',
@@ -125,7 +113,6 @@ local glue = {
     control = 'apiControlCb',
     tictime = 3,
     verbs   = apiVerbs,
-    events  = apiEvents,
     alias  = {'/devtools:/usr/share/afb-ui-devtools/binder'},
 }
 
@@ -141,7 +128,7 @@ local binderOpts = {
 -- create and start binder
 libafb.luastrict(true)
 local binder= libafb.binder(binderOpts)
-local glue= libafb.apiadd(glue)
+local myapi= libafb.apiadd(glue)
 
 -- should never return
 local status= libafb.mainloop('mainLoopCb')

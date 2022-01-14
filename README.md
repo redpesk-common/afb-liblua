@@ -126,7 +126,7 @@ local demoApi = {
     verbs   = MyVerbs,
 }
 
-local glue= libafb.apiadd(demoApi)
+local myapi= libafb.apiadd(demoApi)
 ```
 
 

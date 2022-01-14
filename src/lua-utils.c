@@ -43,8 +43,6 @@ void GlueVerbose(AfbHandleT *handle, int level, const char *file, int line, cons
     va_start(args, fmt);
     switch (handle->magic)
     {
-
-    case GLUE_HANDLER_MAGIC:
     case GLUE_API_MAGIC:
     case GLUE_EVT_MAGIC:
     case GLUE_LOCK_MAGIC:
@@ -124,9 +122,6 @@ afb_api_t GlueGetApi(AfbHandleT*glue) {
         case GLUE_EVT_MAGIC:
             afbApi= glue->evt.apiv4;
             break;
-        case GLUE_HANDLER_MAGIC:
-            afbApi= glue->handler.apiv4;
-            break;
         default:
             afbApi=NULL;
     }
@@ -145,7 +140,7 @@ OnErrorExit:
 }
 
 
-void GlueRqtFree(void *userdata)
+static void GlueRqtFree(void *userdata)
 {
     AfbHandleT *glue= (AfbHandleT*)userdata;
     assert (glue && glue->magic == GLUE_RQT_MAGIC);
@@ -297,14 +292,8 @@ json_object *LuaPopOneArg(lua_State *luaState, int idx)
     {
         lua_Number number = lua_tonumber(luaState, idx);
         int nombre = (int)number; // evil trick to determine wether n fits in an integer. (stolen from ltcl.c)
-        if (number == nombre)
-        {
-            value = json_object_new_int((int)number);
-        }
-        else
-        {
-            value = json_object_new_double(number);
-        }
+        if (number == nombre) value = json_object_new_int(nombre);
+        else value = json_object_new_double(number);
         break;
     }
     case LUA_TBOOLEAN:
@@ -466,9 +455,7 @@ json_object *LuaJsonDbg(lua_State *luaState, const char *message)
     }
 
     // if no lua error remove json field
-    if (error[0] == '0')
-        error = NULL;
-
+    if (!error || error[0] == '0') error = NULL;
     wrap_json_pack(&errorJ, "{ss* ss* si* ss* ss*}", "info", message, "source", source, "line", line, "name", name, "error", error);
 
     return (errorJ);

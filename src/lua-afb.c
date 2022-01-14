@@ -41,31 +41,31 @@
 
 #define SUBCALL_MAX_RPLY 8
 
-static int LuaPrintInfo(lua_State *luaState)
+static int GluePrintInfo(lua_State *luaState)
 {
     int err = LuaPrintMsg(luaState, AFB_SYSLOG_LEVEL_INFO);
     return err;
 }
 
-static int LuaPrintError(lua_State *luaState)
+static int GluePrintError(lua_State *luaState)
 {
     int err = LuaPrintMsg(luaState, AFB_SYSLOG_LEVEL_ERROR);
     return err; // no value return
 }
 
-static int LuaPrintWarning(lua_State *luaState)
+static int GluePrintWarning(lua_State *luaState)
 {
     int err = LuaPrintMsg(luaState, AFB_SYSLOG_LEVEL_WARNING);
     return err;
 }
 
-static int LuaPrintNotice(lua_State *luaState)
+static int GluePrintNotice(lua_State *luaState)
 {
     int err = LuaPrintMsg(luaState, AFB_SYSLOG_LEVEL_NOTICE);
     return err;
 }
 
-static int LuaPrintDebug(lua_State *luaState)
+static int GluePrintDebug(lua_State *luaState)
 {
     int err = LuaPrintMsg(luaState, AFB_SYSLOG_LEVEL_DEBUG);
     return err;
@@ -655,16 +655,10 @@ static int GlueEventHandler(lua_State *luaState)
     json_object *configJ = LuaPopOneArg(luaState, LUA_FIRST_ARG + 1);
     if (!configJ) goto OnErrorExit;
 
-    AfbHandleT *luaHandler= calloc(1, sizeof(AfbHandleT));
-    luaHandler->magic= GLUE_HANDLER_MAGIC;
-    luaHandler->handler.apiv4= afbApi;
-    luaHandler->luaState = lua_newthread(luaState);
-    lua_pushnil(luaHandler->luaState); // keep thread state until timer die
-
-    const char *pattern;
+    const char *pattern, *uid, *callback;
     int err= wrap_json_unpack (configJ, "{ss ss ss}"
-        ,"uid"     , &luaHandler->handler.uid
-        ,"callback", &luaHandler->handler.callback
+        ,"uid"     , &uid
+        ,"callback", &callback
         ,"pattern" , &pattern
     );
     if (err) {
@@ -672,18 +666,26 @@ static int GlueEventHandler(lua_State *luaState)
         goto OnErrorExit;
     }
 
+    void *userdata;
     switch (lua_type(luaState, LUA_FIRST_ARG + 2)) {
         case LUA_TLIGHTUSERDATA:
-            luaHandler->handler.userdata= lua_touserdata(luaState, LUA_FIRST_ARG+2);
+            userdata= lua_touserdata(luaState, LUA_FIRST_ARG+2);
             break;
         case LUA_TNIL:
-            luaHandler->handler.userdata=NULL;
+            userdata=NULL;
             break;
         default:
-            luaHandler->handler.userdata= (void*) LuaPopOneArg(luaState, LUA_FIRST_ARG + 2);
+            userdata= (void*) LuaPopOneArg(luaState, LUA_FIRST_ARG + 2);
     }
 
-    errorMsg= AfbAddOneEvent (afbApi, luaHandler->handler.uid, pattern, GlueEvtHandlerCb, luaHandler);
+    AfbVcbDataT *vcbdata= calloc(1, sizeof(AfbVcbDataT));
+    vcbdata->magic= (void*)AfbAddVerbs;
+    vcbdata->callback= (void*) callback;
+    vcbdata->userdata= userdata;
+    vcbdata->state= (void*) lua_newthread(luaState);
+    lua_pushnil((lua_State*)vcbdata->state); // keep thread state until timer die
+
+    errorMsg= AfbAddOneEvent (afbApi, uid, pattern, GlueEvtHandlerCb, vcbdata);
     if (errorMsg) goto OnErrorExit;
 
     return 0;
@@ -792,7 +794,7 @@ OnErrorExit:
     return 1;
 }
 
-static int LuaGetConfig(lua_State *luaState)
+static int GlueGetConfig(lua_State *luaState)
 {
     const char *errorMsg = "syntax: config(handle[,key])";
     json_object *configJ;
@@ -853,7 +855,7 @@ OnErrorExit:
     return 1;
 }
 
-static int LuaJsonToTable(lua_State *luaState)
+static int GlueSerialize(lua_State *luaState)
 {
     AfbHandleT *binder = LuaBinderPop(luaState);
     assert(binder);
@@ -1003,7 +1005,7 @@ static int GlueBinderConf(lua_State *luaState)
     binder->binder.configJ = LuaPopArgs(luaState, LUA_FIRST_ARG);
     if (!binder->binder.configJ) goto OnErrorExit;
 
-    errorMsg = AfbBinderConfig(binder->binder.configJ, &binder->binder.afb);
+    errorMsg = AfbBinderConfig(binder->binder.configJ, &binder->binder.afb, binder);
     if (errorMsg) goto OnErrorExit;
 
     // load auxiliary libraries
@@ -1054,14 +1056,14 @@ static const luaL_Reg afbFunction[] = {
     {"binder", GlueBinderConf},
     {"apiadd", GlueApiCreate},
     {"verbadd", GlueVerbAdd},
-    {"config", LuaGetConfig},
+    {"config", GlueGetConfig},
     {"binding", GlueBindingLoad},
     {"mainloop", GlueMainLoop},
-    {"notice", LuaPrintNotice},
-    {"info", LuaPrintInfo},
-    {"warning", LuaPrintWarning},
-    {"debug", LuaPrintDebug},
-    {"error", LuaPrintError},
+    {"notice", GluePrintNotice},
+    {"info", GluePrintInfo},
+    {"warning", GluePrintWarning},
+    {"debug", GluePrintDebug},
+    {"error", GluePrintError},
     {"reply", GlueRespond},
     {"exit", GlueExit},
     {"evtsubscribe", GlueEventSubscribe},
@@ -1081,7 +1083,7 @@ static const luaL_Reg afbFunction[] = {
     {"schedwait" , GlueSchedWait},
     {"schedunlock", GlueSchedUnlock},
     {"luastrict", GlueStrict},
-    {"serialize", LuaJsonToTable},
+    {"serialize", GlueSerialize},
 
 
     {NULL, NULL} /* sentinel */

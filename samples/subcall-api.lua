@@ -36,6 +36,14 @@ function pingCB(rqt)
     --return 0, {"pong", count} --implicit response
 end
 
+function helloEventCB (api, name, data)
+    libafb.notice  (api, "helloEventCB name=%s received", name)
+end
+
+function otherEventCB (api, name, data)
+    libafb.notice  (api, "otherEventCB name=%s data=%s", name, data)
+end
+
 function asyncRespCB(rqt, status, ctx, response)
     libafb.notice  (rqt, "asyncRespCB status=%d ctx='%s', response='%s'", status, libafb.serialize(ctx), response)
     libafb.reply (rqt, status, 'async helloworld/testargs', response)
@@ -53,9 +61,20 @@ function syncCB(rqt, query)
     end
 end
 
+function subscribeCB(rqt, query)
+    libafb.notice  (rqt, "subscribeCB helloworld-event/subscribe")
+    local status= libafb.callsync(rqt, "helloworld-event","subscribe")
+    return (status) -- implicit response
+end
+
+function unsubscribeCB(rqt, query)
+    libafb.notice  (rqt, "unsubscribeCB helloworld-event/unsubscribe")
+    local status= libafb.callsync(rqt, "helloworld-event","subscribe")
+    return (status) -- implicit response
+end
+
 function asyncCB(rqt, query)
     libafb.notice  (rqt, "asyncCB calling helloworld/testargs query=%s", query)
-
     libafb.callasync (rqt,"helloworld","testargs","asyncRespCB", 'user-data', query)
     -- response within 'asyncRespCB' callback
 end
@@ -76,7 +95,7 @@ function mainLoopCb(binder)
     libafb.notice(binder, "mainLoopCb=[%s]", libafb.config(binder, "uid"))
 
     -- implement here after your startup/testing code
-    local status= libafb.callsync(binder, "helloworld", "ping")
+    local status= libafb.callsync(binder, "helloworld-event", "startTimer")
     if (status ~= 0) then
         -- force an explicit response
         libafb.notice  (binder, "helloworld/ping fail status=%d", status)
@@ -85,10 +104,17 @@ function mainLoopCb(binder)
 end
 
 -- api verb list
-local demoVerbs = {
-    {uid='lua-ping'    , verb='ping' , callback='pingCB' , info='lua ping demo function'},
-    {uid='lua-synccall', verb='sync' , callback='syncCB' , info='synchronous subcall of private api' , sample={{cezam='open'}, {cezam='close'}}},
-    {uid='lua-asyncall', verb='async', callback='asyncCB', info='asynchronous subcall of private api', sample={{cezam='open'}, {cezam='close'}}},
+local apiVerbs = {
+    {uid='lua-ping'      , verb='ping'       , callback='pingCB'        , info='lua ping demo function'},
+    {uid='lua-synccall'  , verb='sync'       , callback='syncCB'        , info='synchronous subcall of private api' , sample={{cezam='open'}, {cezam='close'}}},
+    {uid='lua-asyncall'  , verb='async'      , callback='asyncCB'       , info='asynchronous subcall of private api', sample={{cezam='open'}, {cezam='close'}}},
+    {uid='py-subscribe'  , verb='subscribe'  , callback='subscribeCB'   , info='Subscribe hello event'},
+    {uid='py-unsubscribe', verb='unsubscribe', callback='unsubscribeCB' , info='Unsubscribe event'},
+}
+
+local apiEvents = {
+    {uid='lua-timer' , pattern='helloworld-event/timerCount', callback='helloEventCB' , info='timer event handler'},
+    {uid='lua-other' , pattern='*', callback='otherEventCB' , info='any other event handler'},
 }
 
 -- define and instanciate API
@@ -99,34 +125,43 @@ local demoApi = {
     info    = 'lua api demo',
     verbose = 9,
     export  = 'public',
-    require = 'helloworld',
+    require = 'helloworld helloworld-event',
     control = 'startApiCb',
-    verbs   = demoVerbs,
+    verbs   = apiVerbs,
+    events  = apiEvents,
+
 }
 
 -- helloworld binding sample definition
-local hellowBinding = {
+local HelloBinding = {
     uid    = 'helloworld',
     export = 'private',
     path   = 'afb-helloworld-skeleton.so',
-    ldpath = {os.getenv("HOME") .. '/opt/helloworld-binding/lib','/usr/local/helloworld-binding/lib'},
-    alias  = {'/hello:' .. os.getenv("HOME") .. '/opt/helloworld-binding/htdocs', '/devtools:/usr/share/afb-ui-devtools/binder'},
+}
+
+local EventBinding = {
+    uid    = 'helloworld',
+    export = 'private',
+    path   = 'afb-helloworld-subscribe-event.so',
 }
 
 -- define and instanciate libafb-binder
-local demoOpts = {
+local DemoBinder = {
     uid     = 'lua-binder',
     port    = 1234,
     verbose = 9,
     roothttp= './conf.d/project/htdocs',
     rootdir = '.',
+    ldpath = {os.getenv("HOME") .. '/opt/helloworld-binding/lib','/usr/local/helloworld-binding/lib'},
+    alias  = {'/devtools:/usr/share/afb-ui-devtools/binder'},
 }
 
 -- create and start binder
 libafb.luastrict(true)
-local binder= libafb.binder(demoOpts)
-local hello = libafb.binding(hellowBinding)
-local glue= libafb.apiadd(demoApi)
+libafb.binder(DemoBinder)
+libafb.binding(HelloBinding)
+libafb.binding(EventBinding)
+libafb.apiadd(demoApi)
 
 -- should never return
 local status= libafb.mainloop('mainLoopCb')
