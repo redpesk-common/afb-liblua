@@ -297,7 +297,6 @@ void GlueVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
         }
         vcbData->callback= (void*)json_object_get_string(funcJ);
     }
-    glue->rqt.vcbData = vcbData;
 
     // retreive input arguments and convert them to json
     for (int idx = 0; idx < nparams; idx++)
@@ -364,7 +363,7 @@ void GlueVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
             GlueReply(glue, status, index, reply);
         }
     }
-
+    for (int idx=0; idx <nparams; idx++) json_object_put(argsJ[idx]);
     return;
 
 OnErrorExit:
