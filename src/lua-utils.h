@@ -25,7 +25,7 @@
 #include <json-c/json.h>
 #include "lua-afb.h"
 
-void GlueVerbose (AfbHandleT *luaState, int level, const char *file, int line, const char *func, const char *fmt, ...);
+void GlueVerbose (GlueHandleT *luaState, int level, const char *file, int line, const char *func, const char *fmt, ...);
 #define GLUE_AFB_INFO(glue,...)    GlueVerbose (glue,AFB_SYSLOG_LEVEL_INFO,__file__,__LINE__,__func__,__VA_ARGS__)
 #define GLUE_AFB_NOTICE(glue,...)  GlueVerbose (glue,AFB_SYSLOG_LEVEL_NOTICE,__file__,__LINE__,__func__,__VA_ARGS__)
 #define GLUE_AFB_WARNING(glue,...) GlueVerbose (glue,AFB_SYSLOG_LEVEL_WARNING,__file__,__LINE__,__func__,__VA_ARGS__)
@@ -33,22 +33,22 @@ void GlueVerbose (AfbHandleT *luaState, int level, const char *file, int line, c
 #define LUA_DBG_ERROR(luaState,glue,...)   LuaInfoDbg (luaState, glue, AFB_SYSLOG_LEVEL_ERROR, __func__, __VA_ARGS__);
 
 
-void LuaInfoDbg (lua_State* luaState, AfbHandleT *glue, int level, const char *func, const char *message);
+void LuaInfoDbg (lua_State* luaState, GlueHandleT *glue, int level, const char *func, const char *message);
 int LuaPrintMsg(lua_State *luaState, int level);
 json_object *LuaJsonDbg (lua_State *luaState, const char *message);
 
-afb_api_t GlueGetApi(AfbHandleT*glue);
-AfbHandleT *GlueRqtNew(afb_req_t afbRqt);
-void GlueRqtAddref(AfbHandleT *glue);
-void GlueRqtUnref(AfbHandleT *glue);
-int GlueReply (AfbHandleT *glue, int status, int nbreply, afb_data_t *reply);
+afb_api_t GlueGetApi(GlueHandleT*glue);
+GlueHandleT *GlueRqtNew(afb_req_t afbRqt);
+void GlueRqtAddref(GlueHandleT *glue);
+void GlueRqtUnref(GlueHandleT *glue);
+int GlueReply (GlueHandleT *glue, int status, int nbreply, afb_data_t *reply);
 
-AfbHandleT* LuaEventPop (lua_State* luaState, int index);
-AfbHandleT* LuaApiPop (lua_State* luaState, int index);
-AfbHandleT *LuaTimerPop(lua_State *luaState, int index);
-AfbHandleT *LuaRqtPop(lua_State *luaState, int index);
-AfbHandleT *LuaLockPop(lua_State *luaState, int index);
-AfbHandleT *LuaBinderPop(lua_State *luaState);
+GlueHandleT* LuaEventPop (lua_State* luaState, int index);
+GlueHandleT* LuaApiPop (lua_State* luaState, int index);
+GlueHandleT *LuaTimerPop(lua_State *luaState, int index);
+GlueHandleT *LuaRqtPop(lua_State *luaState, int index);
+GlueHandleT *LuaLockPop(lua_State *luaState, int index);
+GlueHandleT *LuaBinderPop(lua_State *luaState);
 
 json_object *LuaTableToJson(lua_State *luaState, int index);
 json_object *LuaPopArgs(lua_State *luaState, int start);

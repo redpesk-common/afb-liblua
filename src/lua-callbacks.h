@@ -30,7 +30,7 @@
 #include "lua-utils.h"
 
 typedef struct {
-    AfbHandleT  *handle;
+    GlueHandleT  *handle;
     char *luafunc;
     void *context;
 } LuaAsyncCtxT;
@@ -43,7 +43,7 @@ void GlueVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[]);
 void GlueInfoCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[]);
 void GlueTimerCb (afb_timer_x4_t timer, void *context, int decount);
 int GlueStartupCb(void *callback, void *context);
-void GlueTimerClear(AfbHandleT *glue);
+void GlueTimerClear(GlueHandleT *glue);
 
 void GlueSchedTimeoutCb (int signum, void *context);
-void GlueSchedWaitCb (int signum, void *context, struct afb_sched_lock *afbLock);
+void GlueJobsStartCb (int signum, void *context, struct afb_sched_lock *afbLock);

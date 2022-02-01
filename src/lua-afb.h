@@ -37,22 +37,13 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
-typedef enum {
-    GLUE_BINDER_MAGIC=936714582,
-    GLUE_API_MAGIC=852951357,
-    GLUE_RQT_MAGIC=684756123,
-    GLUE_EVT_MAGIC=894576231,
-    GLUE_TIMER_MAGIC=4628170,
-    GLUE_LOCK_MAGIC=379645852,
-    GLUE_SCHED_MAGIC=73498127,
-} luaGlueMagicsE;
 
 struct LuaBinderHandleS {
     AfbBinderHandleT *afb;
     json_object *configJ;
 };
 
-struct LuaschedwaitS {
+struct LuajobsstartS {
     char *luafunc;
     json_object *dataJ;
     struct afb_sched_lock *afb;
@@ -76,13 +67,13 @@ struct LuaTimerHandleS {
     const char *uid;
     char *callback;
     afb_timer_t afb;
+    afb_api_t apiv4;
     json_object *configJ;
     void *userdata;
     int usage;
 };
 
 struct LuaEvtHandleS {
-    const char *uid;
     const char *name;
     afb_event_t afb;
     json_object *configJ;
@@ -100,7 +91,7 @@ struct LuaHandlerHandleS {
 };
 
 typedef struct {
-    luaGlueMagicsE magic;
+    GlueHandleMagicsE magic;
     lua_State *luaState;
     union {
         struct LuaBinderHandleS binder;
@@ -108,14 +99,14 @@ typedef struct {
         struct LuaApiHandleS api;
         struct LuaRqtHandleS rqt;
         struct LuaTimerHandleS timer;
-        struct LuaschedwaitS lock;
+        struct LuajobsstartS lock;
         struct LuaHandlerHandleS handler;
     };
-} AfbHandleT;
+} GlueHandleT;
 
 typedef struct {
     int magic;
-    AfbHandleT *glue;
+    GlueHandleT *glue;
     char *callback;
     void *userdata;
 } GlueHandleCbT;

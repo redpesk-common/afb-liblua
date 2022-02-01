@@ -242,7 +242,7 @@ In following example, timer runs forever every 'tictime' and call TimerCallback'
 
 ```
 
-When a one shot timer is enough 'schedpost' is usually a better choice. This is especially true for timeout handling. When use in conjunction with mainloop control.
+When a one shot timer is enough 'jobspost' is usually a better choice. This is especially true for timeout handling. When use in conjunction with mainloop control.
 
 ```lua
     -- timer handle callback
@@ -251,12 +251,12 @@ When a one shot timer is enough 'schedpost' is usually a better choice. This is 
         libafb.notice (handle, "I'm in timer callback")
     end
 
-    -- schedpost callback run once and only once
-    jobid= libafb.schedpost (api, 'TimeoutCB', timeoutMS)
+    -- jobspost callback run once and only once
+    jobid= libafb.jobspost (api, 'TimeoutCB', timeoutMS)
     -- do something
 
     --
-    libafb.schedcancel (jobid) -- optionally kill timer before timeout.
+    libafb.jobscancel (jobid) -- optionally kill timer before timeout.
 ```
 
 
@@ -268,17 +268,17 @@ Mainloop starts with libafb.mainloop('xxx'), where 'xxx' is an optional startup 
 * when startup function returns ```status!=0``` the binder immediately exit with corresponding status. This case is very typical when running pure synchronous api test.
 * set a shedwait lock and control the main loop from asynchronous events. This later case is mandatory when we have to start the mainloop to listen event, but still need to exit it to run a new set of test.
 
-Mainloop schedule wait is done with ```libafb.schedwait(binder,'xxx',timeout,{optional-user-data})```. Where 'xxx' is the name of the control callback that received the lock. Schedwait is released with ``` libafb.schedunlock(rqt/evt,lock,status)```
+Mainloop schedule wait is done with ```libafb.jobsstart(binder,'xxx',timeout,{optional-user-data})```. Where 'xxx' is the name of the control callback that received the lock. JobsStart is released with ``` libafb.jobskill(rqt/evt,lock,status)```
 
 In following example:
-* schedwait callback starts an event handler and passes the lock as evt context
+* jobsstart callback starts an event handler and passes the lock as evt context
 * event handler: count the number of event and after 5 events release the lock.
 
 Note:
 
-* libafb.schedwait does not return before the lock is releases. As for events it is the developer responsibility to either carry the lock in a context or to store it within a share space, on order unlock function to access it.
+* libafb.jobsstart does not return before the lock is releases. As for events it is the developer responsibility to either carry the lock in a context or to store it within a share space, on order unlock function to access it.
 
-* it is possible to serialize libafb.schedwait in order to build asynchronous cascade of asynchronous tests.
+* it is possible to serialize libafb.jobsstart in order to build asynchronous cascade of asynchronous tests.
 
 ```lua
 
@@ -286,8 +286,8 @@ Note:
     function EventReceiveCB(evt, name, ctx, data)
         evtCount= evtCount +1
         if (evtCount == 5) then
-            -- schedunlock(handle, lock, status)
-            libafb.schedunlock (evt
+            -- jobskill(handle, lock, status)
+            libafb.jobskill (evt
                 , ctx
                 , evtCount
             )
@@ -295,7 +295,7 @@ Note:
     end
 
     -- retreive shedwait lock and attach it to the event handler
-    function SchedwaitCB(api, lock, context)
+    function JobsStartCB(api, lock, context)
         evtCount=0
         libafb.evthandler(api
             , {uid='timer-event', pattern='helloworld-event/timerCount',func='EventReceiveCB'}
@@ -304,10 +304,10 @@ Note:
         return 0;
         end
 
-    -- set a schedwait on running mainloop
+    -- set a jobsstart on running mainloop
     function startTestCB(binder)
-        status= libafb.schedwait(binder
-            , 'SchedwaitCB'
+        status= libafb.jobsstart(binder
+            , 'JobsStartCB'
             , timeout
             , nil -- optional userdata
         )

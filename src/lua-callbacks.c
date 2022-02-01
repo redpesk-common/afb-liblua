@@ -21,6 +21,7 @@
  * $RP_END_LICENSE$
  */
 
+#include <lua.h>
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
@@ -35,7 +36,7 @@
 #include "lua-utils.h"
 #include "lua-callbacks.h"
 
-void GlueTimerClear(AfbHandleT *glue) {
+void GlueTimerClear(GlueHandleT *glue) {
 
     afb_timer_unref (glue->timer.afb);
     json_object_put(glue->timer.configJ);
@@ -52,14 +53,15 @@ void GlueTimerClear(AfbHandleT *glue) {
 void GlueTimerCb (afb_timer_x4_t timer, void *context, int decount) {
     const char *errorMsg=NULL;
     int status, isnum;
-    AfbHandleT *glue= (AfbHandleT*)context;
+    GlueHandleT *glue= (GlueHandleT*)context;
 
     int stack = lua_gettop(glue->luaState);
     lua_getglobal(glue->luaState, glue->timer.callback);
     lua_pushlightuserdata(glue->luaState, glue);
     lua_pushlightuserdata(glue->luaState, glue->timer.userdata);
+    lua_pushinteger(glue->luaState, decount);
 
-    status = lua_pcall(glue->luaState, 2, LUA_MULTRET, 0);
+    status = lua_pcall(glue->luaState, 3, LUA_MULTRET, 0);
     if (status)
     {
 
@@ -92,7 +94,7 @@ static void GluePcallFunc (void *context, int status, unsigned nreplies, afb_dat
     LuaAsyncCtxT *cbHandle= (LuaAsyncCtxT*) context;
     const char *errorMsg = NULL;
     int err, count;
-    AfbHandleT *glue= cbHandle->handle;
+    GlueHandleT *glue= cbHandle->handle;
 
     // subcall was refused
     if (AFB_IS_BINDER_ERRNO(status)) {
@@ -138,7 +140,7 @@ void GlueEvtHandlerCb (void *userdata, const char *evtName, unsigned nparams, af
     const char *errorMsg = NULL;
     int err, count;
 
-    AfbHandleT *glue= (AfbHandleT*) afb_api_get_userdata(api);
+    GlueHandleT *glue= (GlueHandleT*) afb_api_get_userdata(api);
     assert (glue);
 
     // on first call we compile configJ to boost following py api/verb calls
@@ -173,7 +175,7 @@ void GlueEvtHandlerCb (void *userdata, const char *evtName, unsigned nparams, af
     if (vcbData->userdata) lua_pushlightuserdata(luaState, vcbData->userdata);
     else lua_pushnil(luaState);
 
-    // retreive subcall response and build LUA response
+    // place event data on LUA stack
     errorMsg= LuaPushAfbReply (luaState, nparams, params, &count);
     if (errorMsg) {
         goto OnErrorExit;
@@ -191,9 +193,9 @@ OnErrorExit:
     LUA_DBG_ERROR(luaState, glue, errorMsg);
 }
 
-void GlueSchedWaitCb (int signum, void *context, struct afb_sched_lock *afbLock) {
+void GlueJobsStartCb (int signum, void *context, struct afb_sched_lock *afbLock) {
     const char *errorMsg = NULL;
-    AfbHandleT *luaLock= (AfbHandleT*)context;
+    GlueHandleT *luaLock= (GlueHandleT*)context;
     assert (luaLock && luaLock->magic == GLUE_LOCK_MAGIC);
 
     // define luafunc callback and add glue as 1st argument
@@ -201,7 +203,7 @@ void GlueSchedWaitCb (int signum, void *context, struct afb_sched_lock *afbLock)
     lua_getglobal(luaLock->luaState, luaLock->lock.luafunc);
     lua_State *luaState= luaLock->luaState;
     // create a fake API for waitCB
-    AfbHandleT glue;
+    GlueHandleT glue;
     glue.luaState= luaState;
     glue.magic= GLUE_API_MAGIC;
     glue.api.afb=luaLock->lock.apiv4;
@@ -277,7 +279,7 @@ void GlueVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
     int err, count;
     afb_data_t args[nparams];
     json_object *argsJ[nparams];
-    AfbHandleT *glue = GlueRqtNew(afbRqt);
+    GlueHandleT *glue = GlueRqtNew(afbRqt);
     lua_State *luaState= glue->luaState;
 
     // on first call we compile configJ to boost following py api/verb calls
@@ -363,7 +365,9 @@ void GlueVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
             GlueReply(glue, status, index, reply);
         }
     }
-    for (int idx=0; idx <nparams; idx++) json_object_put(argsJ[idx]);
+    for (int idx=0; idx <nparams; idx++) {
+        json_object_put(argsJ[idx]);
+    }
     return;
 
 OnErrorExit:
@@ -383,7 +387,7 @@ void GlueInfoCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
     afb_data_t reply;
 
     // retreive interpreteur from API
-    AfbHandleT *glue = afb_api_get_userdata(apiv4);
+    GlueHandleT *glue = afb_api_get_userdata(apiv4);
     assert(glue->magic == GLUE_API_MAGIC);
 
     // extract uid + info from API config
@@ -424,7 +428,7 @@ void GlueInfoCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[])
 int GlueStartupCb(void* callback, void *context)
 {
     const char *funcname= (char*) callback;
-    AfbHandleT *binder = (AfbHandleT *)context;
+    GlueHandleT *binder = (GlueHandleT *)context;
     int err, count;
 
     assert(binder && binder->magic == GLUE_BINDER_MAGIC);
@@ -457,7 +461,7 @@ OnErrorExit:
 }
 
 int GlueCtrlCb(afb_api_t apiv4, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *context) {
-    AfbHandleT *glue= (AfbHandleT*) context;
+    GlueHandleT *glue= (GlueHandleT*) context;
     static int orphan=0;
     const char *state;
     int err=0;

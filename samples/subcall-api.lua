@@ -100,7 +100,7 @@ function mainLoopCb(binder)
         -- force an explicit response
         libafb.notice  (binder, "helloworld/ping fail status=%d", status)
     end
-    return status -- negative status force mainloop exit
+    return status -- negative status force loopstart exit
 end
 
 -- api verb list
@@ -158,15 +158,10 @@ local DemoBinder = {
 
 -- create and start binder
 libafb.luastrict(true)
-libafb.binder(DemoBinder)
-libafb.binding(HelloBinding)
-libafb.binding(EventBinding)
-libafb.apiadd(demoApi)
+local binder= libafb.binder(DemoBinder)
+local hello =libafb.binding(HelloBinding)
+local event =libafb.binding(EventBinding)
+local luaapi=libafb.apiadd(demoApi)
 
 -- should never return
-local status= libafb.mainloop('mainLoopCb')
-if (status < 0) then
-    libafb.error (binder, "OnError MainLoop Exit")
-else
-    libafb.notice(binder, "OnSuccess Mainloop Exit")
-end
+local status= libafb.loopstart('mainLoopCb')

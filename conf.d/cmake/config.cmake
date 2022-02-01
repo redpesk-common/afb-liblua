@@ -32,6 +32,9 @@ set(PROJECT_LICENSE "redpesk")
 set(PROJECT_LANGUAGES,"C")
 set(API_NAME "shell")
 
+# generate vscode intellisense for clangd/llvm-vs-code-extensions
+set(CMAKE_EXPORT_COMPILE_COMMANDS on)
+
 # Where are stored default templates files from submodule or subtree app-templates in your project tree
 # relative to the root project directory
 set(PROJECT_CMAKE_CONF_DIR "conf.d")

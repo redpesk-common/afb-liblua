@@ -21,6 +21,7 @@
  * $RP_END_LICENSE$
  */
 
+#include <lua.h>
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
@@ -74,7 +75,7 @@ static int GluePrintDebug(lua_State *luaState)
 static int GlueTimerAddref(lua_State* luaState) {
     const char *errorMsg="syntax: timeraddref(handle)";
 
-    AfbHandleT *glue= LuaTimerPop(luaState, 1);
+    GlueHandleT *glue= LuaTimerPop(luaState, 1);
     if (!glue) goto OnErrorExit;
 
     afb_timer_addref (glue->timer.afb);
@@ -93,7 +94,7 @@ OnErrorExit:
 static int GlueTimerUnref(lua_State* luaState) {
     const char *errorMsg="syntax: timerunref(handle)";
 
-    AfbHandleT *glue= LuaTimerPop(luaState, 1);
+    GlueHandleT *glue= LuaTimerPop(luaState, 1);
     if (!glue) goto OnErrorExit;
 
     GlueTimerClear(glue);
@@ -108,11 +109,11 @@ OnErrorExit:
 
 static int GlueTimerNew(lua_State *luaState)
 {
-    const char *errorMsg = "syntax: timernew(api, config, context)";
-    AfbHandleT *glue= (AfbHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
+    const char *errorMsg = "syntax: timernew(api, {'uid':'xxx','callback':yyy,'period':ms,'count':nn}, context)";
+    GlueHandleT *glue= (GlueHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
     if (!glue) goto OnErrorExit;
 
-    AfbHandleT *handle= (AfbHandleT *)calloc(1, sizeof(AfbHandleT));
+    GlueHandleT *handle= (GlueHandleT *)calloc(1, sizeof(GlueHandleT));
     handle->magic = GLUE_TIMER_MAGIC;
     handle->luaState = lua_newthread(luaState); // private interpretor
     lua_pushnil(handle->luaState); // keep thread state until timer die
@@ -120,6 +121,10 @@ static int GlueTimerNew(lua_State *luaState)
     handle->timer.configJ = LuaPopOneArg(luaState, LUA_FIRST_ARG+1);
     json_object_get(handle->timer.configJ);
     if (!handle->timer.configJ)  goto OnErrorExit;
+
+    // retreive API from py handle
+    handle->timer.apiv4= GlueGetApi(glue);
+    if (!handle->timer.apiv4) goto OnErrorExit;
 
     switch (lua_type(luaState, LUA_FIRST_ARG + 2)) {
         case LUA_TLIGHTUSERDATA:
@@ -170,7 +175,7 @@ static int GlueRespond(lua_State *luaState)
     json_object *argsJ[argc];
     afb_data_t reply[argc];
 
-    AfbHandleT *glue = LuaRqtPop(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = LuaRqtPop(luaState, LUA_FIRST_ARG);
     if (!glue) goto OnErrorExit;
 
     // get restart status 1st
@@ -213,7 +218,7 @@ static int GlueEventPush(lua_State *luaState)
     afb_data_t reply[argc];
 
     // check evt handle
-    AfbHandleT *luaEvt = LuaEventPop(luaState, LUA_FIRST_ARG);
+    GlueHandleT *luaEvt = LuaEventPop(luaState, LUA_FIRST_ARG);
     if (!luaEvt) goto OnErrorExit;
 
     // get response from LUA and push them as afb-v4 object
@@ -246,10 +251,10 @@ static int GlueEventSubscribe(lua_State *luaState)
 {
     const char *errorMsg = "syntax: subscribe(rqt, event)";
 
-    AfbHandleT *glue = LuaRqtPop(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = LuaRqtPop(luaState, LUA_FIRST_ARG);
     if (!glue) goto OnErrorExit;
 
-    AfbHandleT *luaEvt = LuaEventPop(luaState, LUA_FIRST_ARG + 1);
+    GlueHandleT *luaEvt = LuaEventPop(luaState, LUA_FIRST_ARG + 1);
     if (!luaEvt) goto OnErrorExit;
 
     int err = afb_req_subscribe(glue->rqt.afb, luaEvt->evt.afb);
@@ -271,10 +276,10 @@ static int GlueEventUnsubscribe(lua_State *luaState)
 {
     const char *errorMsg = "syntax: unsubscribe(rqt, event)";
 
-    AfbHandleT *glue = LuaRqtPop(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = LuaRqtPop(luaState, LUA_FIRST_ARG);
     if (!glue) goto OnErrorExit;
 
-    AfbHandleT *luaEvt = LuaEventPop(luaState, LUA_FIRST_ARG + 1);
+    GlueHandleT *luaEvt = LuaEventPop(luaState, LUA_FIRST_ARG + 1);
     if (!luaEvt) goto OnErrorExit;
 
     int err = afb_req_unsubscribe(glue->rqt.afb, luaEvt->evt.afb);
@@ -297,7 +302,7 @@ static int GlueEventNew(lua_State *luaState)
     const char *errorMsg= "syntax: eventnew(api, config)";
     int err;
 
-    AfbHandleT *glue = LuaApiPop(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = LuaApiPop(luaState, LUA_FIRST_ARG);
     if (!glue)
     {
         errorMsg = "invalid request handle";
@@ -305,7 +310,7 @@ static int GlueEventNew(lua_State *luaState)
     }
 
     // create a new binder event
-    AfbHandleT *luaEvt = calloc(1, sizeof(AfbHandleT));
+    GlueHandleT *luaEvt = calloc(1, sizeof(GlueHandleT));
     luaEvt->magic = GLUE_EVT_MAGIC;
     luaEvt->evt.apiv4= GlueGetApi(glue);
     luaEvt->luaState = lua_newthread(luaState);
@@ -315,10 +320,11 @@ static int GlueEventNew(lua_State *luaState)
     json_object_get(luaEvt->evt.configJ);
     if (!luaEvt->evt.configJ) goto OnErrorExit;
 
+    const char *uid;
     luaEvt->evt.configJ= luaEvt->evt.configJ;
     json_object_get(luaEvt->evt.configJ);
     err = wrap_json_unpack(luaEvt->evt.configJ, "{ss, s?s}"
-        ,"uid"     , &luaEvt->evt.uid
+        ,"uid"     , &uid
         ,"name"    , &luaEvt->evt.name
     );
     if (err)
@@ -326,7 +332,7 @@ static int GlueEventNew(lua_State *luaState)
         errorMsg ="evtconf={uid='xxx', name='yyyy'}";
         goto OnErrorExit;
     }
-    if (!luaEvt->evt.name) luaEvt->evt.name=luaEvt->evt.uid;
+    if (!luaEvt->evt.name) luaEvt->evt.name=uid;
 
     err= afb_api_new_event(glue->api.afb, luaEvt->evt.name, &luaEvt->evt.afb);
     if (err)
@@ -354,7 +360,7 @@ static int GlueAsyncCall(lua_State *luaState)
     json_object *argsJ[argc];
     afb_data_t params[argc];
 
-    AfbHandleT *glue = (AfbHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = (GlueHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
     if (!glue) goto OnErrorExit;
 
     // get restart status 1st
@@ -429,7 +435,7 @@ static int GlueSyncCall(lua_State *luaState)
     unsigned nreplies= SUBCALL_MAX_RPLY;
     afb_data_t replies[SUBCALL_MAX_RPLY];
 
-    AfbHandleT *glue = (AfbHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = (GlueHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
     if (!glue) goto OnErrorExit;
 
     // get restart status 1st
@@ -492,13 +498,13 @@ OnErrorExit:
     return 1;
 }
 
-static int GlueSchedWait(lua_State *luaState)
+static int GlueJobsStart(lua_State *luaState)
 {
-    AfbHandleT *luaLock=NULL;
-    const char *errorMsg = "syntax: schedwait(handle, timeout, callback, [context])";
+    GlueHandleT *luaLock=NULL;
+    const char *errorMsg = "syntax: jobsstart(handle, timeout, callback, [context])";
     int err;
 
-    AfbHandleT *glue = (AfbHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = (GlueHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
     if (!glue) goto OnErrorExit;
 
     int isNum;
@@ -508,14 +514,14 @@ static int GlueSchedWait(lua_State *luaState)
     const char *funcname= lua_tostring(luaState, LUA_FIRST_ARG+2);
     if (!funcname) goto OnErrorExit;
 
-    luaLock= calloc (1, sizeof(AfbHandleT));
+    luaLock= calloc (1, sizeof(GlueHandleT));
     luaLock->magic= GLUE_LOCK_MAGIC;
     luaLock->luaState= luaState;
     luaLock->lock.luafunc= strdup(funcname);
     luaLock->lock.apiv4= GlueGetApi(glue);
     luaLock->lock.dataJ= (void*) LuaPopOneArg(luaState, LUA_FIRST_ARG + 2);
 
-    err= afb_sched_enter(NULL, timeout, GlueSchedWaitCb, luaLock);
+    err= afb_sched_enter(NULL, timeout, GlueJobsStartCb, luaLock);
     if (err < 0) {
         errorMsg= "afb_sched_enter (timeout?)";
         goto OnErrorExit;
@@ -537,11 +543,11 @@ OnErrorExit:
     return 2;
 }
 
-static int GlueSchedCancel(lua_State *luaState)
+static int GlueJobsCancel(lua_State *luaState)
 {
-    const char *errorMsg = "syntax: schedcancel(jobid)";
+    const char *errorMsg = "syntax: jobscancel(jobid)";
 
-    AfbHandleT *binder = LuaBinderPop(luaState);
+    GlueHandleT *binder = LuaBinderPop(luaState);
     assert(binder);
 
     int isnum;
@@ -557,13 +563,13 @@ OnErrorExit:
     return 0;
 }
 
-static int GlueSchedPost(lua_State *luaState)
+static int GlueJobsPost(lua_State *luaState)
 {
-    const char *errorMsg = "syntax: schedpost(handle, timeout, callback [,userdata])";
+    const char *errorMsg = "syntax: jobspost(handle, timeout, callback [,userdata])";
     GlueHandleCbT *handle=calloc (1, sizeof(GlueHandleCbT));
     handle->magic= GLUE_SCHED_MAGIC;
 
-    handle->glue = (AfbHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
+    handle->glue = (GlueHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
     if (!handle->glue) goto OnErrorExit;
 
     const char* callback= lua_tostring(luaState, LUA_FIRST_ARG + 1);
@@ -601,28 +607,28 @@ OnErrorExit:
     return 1;
 }
 
-static int GlueSchedUnlock(lua_State *luaState)
+static int GlueJobsKill(lua_State *luaState)
 {
     const char *errorMsg = NULL;
     int err;
 
-    AfbHandleT *glue = (AfbHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = (GlueHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG);
     if (!glue)
     {
-        errorMsg = "invalid lua handle: syntax: schedunlock(handle, lock, status)";
+        errorMsg = "invalid lua handle: syntax: jobskill(handle, lock, status)";
         goto OnErrorExit;
     }
 
-    AfbHandleT *luaLock = (AfbHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG+1);
+    GlueHandleT *luaLock = (GlueHandleT *)lua_touserdata(luaState, LUA_FIRST_ARG+1);
     if (!luaLock || luaLock->magic != GLUE_LOCK_MAGIC) {
-        errorMsg = "invalid lock handle: syntax: schedunlock(handle, lock, status)";
+        errorMsg = "invalid lock handle: syntax: jobskill(handle, lock, status)";
         goto OnErrorExit;
     }
 
     int isNum;
     luaLock->lock.status = (int)lua_tointegerx (luaState, LUA_FIRST_ARG +2, &isNum);
     if (!isNum) {
-        errorMsg = "status require integer: syntax: schedunlock(handle, lock, status)";
+        errorMsg = "status require integer: syntax: jobskill(handle, lock, status)";
     }
 
     err= afb_sched_leave(luaLock->lock.afb);
@@ -642,9 +648,9 @@ OnErrorExit:
 
 static int GlueEventHandler(lua_State *luaState)
 {
-    const char *errorMsg = "syntax: evthandler(handle, config, userdata)";
+    const char *errorMsg = "syntax: evthandler(handle, {'uid':'xxx','pattern':'yyy','callback':'zzz'}, userdata)";
 
-    AfbHandleT *glue = lua_touserdata(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = lua_touserdata(luaState, LUA_FIRST_ARG);
     if (!glue) goto OnErrorExit;
 
     // retreive API from lua handle
@@ -700,9 +706,9 @@ OnErrorExit:
 static int GlueVerbAdd(lua_State *luaState)
 {
     const char *errorMsg = "syntax: addverb(api, config, callback, context)";
-    AfbHandleT *binder = LuaBinderPop(luaState);
+    GlueHandleT *binder = LuaBinderPop(luaState);
 
-    AfbHandleT *glue = LuaApiPop(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = LuaApiPop(luaState, LUA_FIRST_ARG);
     if (!glue) goto OnErrorExit;
 
     // get restart status 1st
@@ -738,7 +744,7 @@ static int GlueSetLoa(lua_State *luaState)
     const char *errorMsg = "syntax: setloa(rqt, newloa)";
     int isNum, loa, err;
 
-    AfbHandleT *glue = LuaRqtPop(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = LuaRqtPop(luaState, LUA_FIRST_ARG);
     if (!glue) goto OnErrorExit;
 
     loa = (int) lua_tointegerx (luaState, LUA_FIRST_ARG + 1, &isNum);
@@ -763,7 +769,7 @@ static int GlueClientInfo(lua_State *luaState)
 {
     const char *errorMsg = "syntax: clientinfo(rqt, ['key'])";
 
-    AfbHandleT *glue = LuaRqtPop(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = LuaRqtPop(luaState, LUA_FIRST_ARG);
     if (!glue) goto OnErrorExit;
 
     // if optional key is provided return only this value
@@ -799,11 +805,11 @@ static int GlueGetConfig(lua_State *luaState)
     const char *errorMsg = "syntax: config(handle[,key])";
     json_object *configJ;
 
-    AfbHandleT *binder = LuaBinderPop(luaState);
+    GlueHandleT *binder = LuaBinderPop(luaState);
     assert(binder);
 
     // check api handle
-    AfbHandleT *glue = lua_touserdata(luaState, 1);
+    GlueHandleT *glue = lua_touserdata(luaState, 1);
     if (!glue) goto OnErrorExit;
 
     switch (glue->magic)
@@ -839,12 +845,8 @@ static int GlueGetConfig(lua_State *luaState)
     else
     {
         json_object *slotJ = json_object_object_get(configJ, key);
-        if (!slotJ)
-        {
-            errorMsg = "GlueGetConfig: unknown config key";
-            goto OnErrorExit;
-        }
-        LuaPushOneArg(luaState, slotJ);
+        if (!slotJ) lua_pushnil(luaState);
+        else LuaPushOneArg(luaState, slotJ);
     }
     return 1;
 
@@ -857,7 +859,7 @@ OnErrorExit:
 
 static int GlueSerialize(lua_State *luaState)
 {
-    AfbHandleT *binder = LuaBinderPop(luaState);
+    GlueHandleT *binder = LuaBinderPop(luaState);
     assert(binder);
     const char *errorMsg = NULL;
 
@@ -900,14 +902,14 @@ static int GlueApiCreate(lua_State *luaState)
     json_object *configJ;
     int err;
 
-    AfbHandleT *binder = LuaBinderPop(luaState);
+    GlueHandleT *binder = LuaBinderPop(luaState);
     assert(binder);
 
     // parse afbApi config
     configJ = LuaPopArgs(luaState, LUA_FIRST_ARG);
     if (!configJ) goto OnErrorExit;
 
-    AfbHandleT *glue = calloc(1, sizeof(AfbHandleT));
+    GlueHandleT *glue = calloc(1, sizeof(GlueHandleT));
     glue->magic = GLUE_API_MAGIC;
     glue->luaState = lua_newthread(luaState);
     lua_pushnil(glue->luaState); // prevent garbage collector from cleaning this thread
@@ -948,7 +950,7 @@ static int GlueBindingLoad(lua_State *luaState)
     const char *errorMsg = "syntax: binding(config)";
     json_object *configJ;
 
-    AfbHandleT *binder = LuaBinderPop(luaState);
+    GlueHandleT *binder = LuaBinderPop(luaState);
     if (!binder)
         goto OnErrorExit;
 
@@ -969,10 +971,10 @@ OnErrorExit:
     return 1;
 }
 
-// this routine execute within mainloop context when binder is ready to go
-static int GlueMainLoop(lua_State *luaState)
+// this routine execute within loopstart context when binder is ready to go
+static int GlueLoopStart(lua_State *luaState)
 {
-    AfbHandleT *binder = LuaBinderPop(luaState);
+    GlueHandleT *binder = LuaBinderPop(luaState);
     const char *callback;
     int status = 0;
 
@@ -980,7 +982,7 @@ static int GlueMainLoop(lua_State *luaState)
     callback = lua_tostring(luaState, LUA_FIRST_ARG);
 
     // main loop only return when binder startup func return status!=0
-    GLUE_AFB_NOTICE(binder, "Entering binder mainloop");
+    GLUE_AFB_NOTICE(binder, "Entering binder loopstart");
     status = AfbBinderStart(binder->binder.afb, (void*)callback, GlueStartupCb, binder);
     lua_pushinteger(luaState, status);
     return 1;
@@ -989,7 +991,7 @@ static int GlueMainLoop(lua_State *luaState)
 // Load Lua glue functions
 static int GlueBinderConf(lua_State *luaState)
 {
-    AfbHandleT *binder = LuaBinderPop(luaState);
+    GlueHandleT *binder = LuaBinderPop(luaState);
     static int luaLoaded = 0;
     const char *errorMsg = "syntax: binder(config)";
 
@@ -1023,8 +1025,8 @@ OnErrorExit:
 
 static int GlueExit(lua_State *luaState)
 {
-    AfbHandleT *binder = LuaBinderPop(luaState);
-    AfbHandleT *handle = lua_touserdata(luaState, LUA_FIRST_ARG);
+    GlueHandleT *binder = LuaBinderPop(luaState);
+    GlueHandleT *handle = lua_touserdata(luaState, LUA_FIRST_ARG);
 
     int isNum;
     long exitCode = lua_tointegerx(luaState, LUA_FIRST_ARG+1, &isNum);
@@ -1042,7 +1044,7 @@ OnErrorExit:
 
 static int GluePing(lua_State *luaState)
 {
-    AfbHandleT *binder = LuaBinderPop(luaState);
+    GlueHandleT *binder = LuaBinderPop(luaState);
     static int count = 0;
 
     GLUE_AFB_NOTICE(binder, "GluePing count=%d", count);
@@ -1058,7 +1060,7 @@ static const luaL_Reg afbFunction[] = {
     {"verbadd", GlueVerbAdd},
     {"config", GlueGetConfig},
     {"binding", GlueBindingLoad},
-    {"mainloop", GlueMainLoop},
+    {"loopstart", GlueLoopStart},
     {"notice", GluePrintNotice},
     {"info", GluePrintInfo},
     {"warning", GluePrintWarning},
@@ -1078,10 +1080,10 @@ static const luaL_Reg afbFunction[] = {
     {"callsync", GlueSyncCall},
     {"setloa", GlueSetLoa},
     {"clientinfo", GlueClientInfo},
-    {"schedpost" , GlueSchedPost},
-    {"schedcancel" , GlueSchedCancel},
-    {"schedwait" , GlueSchedWait},
-    {"schedunlock", GlueSchedUnlock},
+    {"jobspost" , GlueJobsPost},
+    {"jobscancel" , GlueJobsCancel},
+    {"jobsstart" , GlueJobsStart},
+    {"jobskill", GlueJobsKill},
     {"luastrict", GlueStrict},
     {"serialize", GlueSerialize},
 
@@ -1095,7 +1097,7 @@ static const luaL_Reg afbFunction[] = {
 int luaopen_luaglue(lua_State *luaState)
 {
 
-    AfbHandleT *handle = calloc(1, sizeof(AfbHandleT));
+    GlueHandleT *handle = calloc(1, sizeof(GlueHandleT));
     handle->magic = GLUE_BINDER_MAGIC;
     handle->luaState = luaState;
 

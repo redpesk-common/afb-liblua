@@ -5,101 +5,69 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "LuaHelper-Debug",
+            // extention: codeLLDB-vadimcn
+            "name": "simple-lua",
+            "type": "lldb",
             "request": "launch",
-            "name": "Lua-DebugFile",
-            "luaPath": "",
-            "packagePath": [],
-            "luaFileExtension": "",
-            "connectionPort": 8818,
-            "stopOnEntry": false,
-            "useCHook": true,
+            "program": "/usr/bin/lua",
             "cwd": "${workspaceFolder}",
-            "env": {"LD_LIBRARY_PATH": "${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64"},
+            "initCommands": ["target stop-hook add -n _start -o continue"],
+            "args": ["./samples/simple-api.lua"],
+            "env": {
+                "LD_LIBRARY_PATH":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"
+            },
         },
         {
-          // lua ../src/lua-binder.lua ../sample/
-          "name": "simple-lua",
-          "type": "cppdbg",
-          "request": "launch",
-          "program": "/usr/bin/lua",
-          "args": ["./samples/simple-api.lua"],
-          "stopAtEntry": false,
-          "cwd": "${workspaceFolder}",
-          "environment": [{"name":"LD_LIBRARY_PATH", "value":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"}],
-          "externalConsole": false,
-          "MIMode": "gdb",
-          "setupCommands": [
-            {
-              "description": "Enable pretty-printing for gdb",
-              "text": "-enable-pretty-printing",
-              "ignoreFailures": true
-            }
-          ],
-          "miDebuggerPath": "/usr/bin/gdb"
-        },
-         {
-          // lua ../src/lua-binder.lua ../sample/
-          "name": "subcall-lua",
-          "type": "cppdbg",
-          "request": "launch",
-          "program": "/usr/bin/lua",
-          "args": ["./samples/subcall-api.lua"],
-          "stopAtEntry": false,
-          "cwd": "${workspaceFolder}",
-          "environment": [{"name":"LD_LIBRARY_PATH", "value":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"}],
-          "externalConsole": false,
-          "MIMode": "gdb",
-          "setupCommands": [
-            {
-              "description": "Enable pretty-printing for gdb",
-              "text": "-enable-pretty-printing",
-              "ignoreFailures": true
-            }
-          ],
-          "miDebuggerPath": "/usr/bin/gdb"
+            // extention: codeLLDB-vadimcn
+            "name": "subcall-lua",
+            "type": "lldb",
+            "request": "launch",
+            "program": "/usr/bin/lua",
+            "initCommands": ["target stop-hook add -n _start -o continue"],
+            "cwd": "${workspaceFolder}",
+            "args": ["./samples/subcall-api.lua"],
+            "env": {
+                "LD_LIBRARY_PATH":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"
+            },
         },
         {
-          // lua ../src/lua-binder.lua ../sample/
-          "name": "event-lua",
-          "type": "cppdbg",
-          "request": "launch",
-          "program": "/usr/bin/lua",
-          "args": ["./samples/event-api.lua"],
-          "stopAtEntry": false,
-          "cwd": "${workspaceFolder}",
-          "environment": [{"name":"LD_LIBRARY_PATH", "value":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"}],
-          "externalConsole": false,
-          "MIMode": "gdb",
-          "setupCommands": [
-            {
-              "description": "Enable pretty-printing for gdb",
-              "text": "-enable-pretty-printing",
-              "ignoreFailures": true
-            }
-          ],
-          "miDebuggerPath": "/usr/bin/gdb"
-        },
-         {
-          // lua ../src/lua-binder.lua ../sample/
-          "name": "test-lua",
-          "type": "cppdbg",
-          "request": "launch",
-          "program": "/usr/bin/lua",
-          "args": ["./samples/test-api.lua"],
-          "stopAtEntry": false,
-          "cwd": "${workspaceFolder}",
-          "environment": [{"name":"LD_LIBRARY_PATH", "value":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"}],
-          "externalConsole": false,
-          "MIMode": "gdb",
-          "setupCommands": [
-            {
-              "description": "Enable pretty-printing for gdb",
-              "text": "-enable-pretty-printing",
-              "ignoreFailures": true
-            }
-          ],
-          "miDebuggerPath": "/usr/bin/gdb"
-        },
+            // extention: codeLLDB-vadimcn
+            "name": "loa-lua",
+            "type": "lldb",
+            "request": "launch",
+            "program": "/usr/bin/lua",
+            "initCommands": ["target stop-hook add -n _start -o continue"],
+            "cwd": "${workspaceFolder}",
+            "args": ["./samples/loa-api.lua"],
+            "env": {
+                "LD_LIBRARY_PATH":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"
+            },
+        },    
+        {
+            // extention: codeLLDB-vadimcn
+            "name": "event-lua",
+            "type": "lldb",
+            "request": "launch",
+            "program": "/usr/bin/lua",
+            "initCommands": ["target stop-hook add -n _start -o continue"],
+            "cwd": "${workspaceFolder}",
+            "args": ["./samples/event-api.lua"],
+            "env": {
+                "LD_LIBRARY_PATH":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"
+            },
+        },    
+        {
+            // extention: codeLLDB-vadimcn
+            "name": "test-lua",
+            "type": "lldb",
+            "request": "launch",
+            "program": "/usr/bin/lua",
+            "initCommands": ["target stop-hook add -n _start -o continue"],
+            "cwd": "${workspaceFolder}",
+            "args": ["./samples/test-api.lua"],
+            "env": {
+                "LD_LIBRARY_PATH":"${workspaceFolder}/../afb-libglue/build/src:/usr/local/lib64:"
+            },
+        },    
      ]
 }

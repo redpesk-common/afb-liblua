@@ -35,7 +35,7 @@ function EventReceiveCB(evt, name, lock, data)
     evtCount= evtCount +1
     if (evtCount == 5) then
         libafb.notice (evt, "*** EventReceiveCB releasing lock ***");
-        libafb.schedunlock (evt, lock, evtCount) -- schedunlock(handle, lock, status)
+        libafb.jobskill (evt, lock, evtCount) -- jobskill(handle, lock, status)
     end
 end
 
@@ -78,7 +78,7 @@ function startTestCB(binder)
     if (status ~=0) then goto done end
 
     libafb.notice (binder, "waiting (%ds) for test to finish", timeout)
-    status= libafb.schedwait(binder, timeout, 'aSyncEventTest', nil)
+    status= libafb.jobsstart(binder, timeout, 'aSyncEventTest', nil)
     if (status < 0) then goto done end
 
     ::done::
@@ -112,7 +112,7 @@ local binder= libafb.binder(eventOpts)
 local hello = libafb.binding(hellowBinding)
 
 -- should never return
-local status= libafb.mainloop('startTestCB')
+local status= libafb.loopstart('startTestCB')
 if (status < 0) then
     libafb.error (binder, "OnError MainLoop Exit")
 else

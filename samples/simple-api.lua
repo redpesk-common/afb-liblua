@@ -78,9 +78,5 @@ local binder= libafb.binder(demoOpts)
 local myapi= libafb.apiadd(demoApi)
 
 -- should never return
-local status= libafb.mainloop('loopBinderCb')
-if (status < 0) then
-    libafb.error (binder, "OnError MainLoop Exit")
-else
-    libafb.notice(binder, "OnSuccess Mainloop Exit")
-end
+local status= libafb.loopstart('loopBinderCb')
+

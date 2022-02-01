@@ -36,7 +36,7 @@
 
 
 
-void GlueVerbose(AfbHandleT *handle, int level, const char *file, int line, const char *func, const char *fmt, ...)
+void GlueVerbose(GlueHandleT *handle, int level, const char *file, int line, const char *func, const char *fmt, ...)
 {
     va_list args;
 
@@ -60,9 +60,9 @@ void GlueVerbose(AfbHandleT *handle, int level, const char *file, int line, cons
     return;
 }
 
-AfbHandleT *LuaRqtPop(lua_State *luaState, int index)
+GlueHandleT *LuaRqtPop(lua_State *luaState, int index)
 {
-    AfbHandleT *handle = (AfbHandleT *)lua_touserdata(luaState, index);
+    GlueHandleT *handle = (GlueHandleT *)lua_touserdata(luaState, index);
     if (handle == NULL || handle->magic != GLUE_RQT_MAGIC)
         goto OnErrorExit;
     return handle;
@@ -71,9 +71,9 @@ OnErrorExit:
     return NULL;
 }
 
-AfbHandleT *LuaEventPop(lua_State *luaState, int index)
+GlueHandleT *LuaEventPop(lua_State *luaState, int index)
 {
-    AfbHandleT *luaEvt = (AfbHandleT *)lua_touserdata(luaState, index);
+    GlueHandleT *luaEvt = (GlueHandleT *)lua_touserdata(luaState, index);
     if (!luaEvt || luaEvt->magic != GLUE_EVT_MAGIC || !afb_event_is_valid(luaEvt->evt.afb))
         goto OnErrorExit;
     return luaEvt;
@@ -82,9 +82,9 @@ OnErrorExit:
     return NULL;
 }
 
-AfbHandleT *LuaApiPop(lua_State *luaState, int index)
+GlueHandleT *LuaApiPop(lua_State *luaState, int index)
 {
-    AfbHandleT *glue = (AfbHandleT *)lua_touserdata(luaState, index);
+    GlueHandleT *glue = (GlueHandleT *)lua_touserdata(luaState, index);
     if (!glue || glue->magic != GLUE_API_MAGIC)
         goto OnErrorExit;
     return glue;
@@ -92,9 +92,9 @@ AfbHandleT *LuaApiPop(lua_State *luaState, int index)
 OnErrorExit:
     return NULL;
 }
-AfbHandleT *LuaLockPop(lua_State *luaState, int index)
+GlueHandleT *LuaLockPop(lua_State *luaState, int index)
 {
-    AfbHandleT *luaLock = (AfbHandleT *)lua_touserdata(luaState, index);
+    GlueHandleT *luaLock = (GlueHandleT *)lua_touserdata(luaState, index);
     if (!luaLock || luaLock->magic != GLUE_LOCK_MAGIC)
         goto OnErrorExit;
     return luaLock;
@@ -104,7 +104,7 @@ OnErrorExit:
 }
 
 // retreive API from lua handle
-afb_api_t GlueGetApi(AfbHandleT*glue) {
+afb_api_t GlueGetApi(GlueHandleT*glue) {
    afb_api_t afbApi;
     switch (glue->magic) {
         case GLUE_API_MAGIC:
@@ -128,9 +128,9 @@ afb_api_t GlueGetApi(AfbHandleT*glue) {
     return afbApi;
 }
 
-AfbHandleT *LuaTimerPop(lua_State *luaState, int index)
+GlueHandleT *LuaTimerPop(lua_State *luaState, int index)
 {
-    AfbHandleT *glue = (AfbHandleT *)lua_touserdata(luaState, index);
+    GlueHandleT *glue = (GlueHandleT *)lua_touserdata(luaState, index);
     if (!glue || glue->magic != GLUE_TIMER_MAGIC)
         goto OnErrorExit;
     return glue;
@@ -142,7 +142,7 @@ OnErrorExit:
 
 static void GlueRqtFree(void *userdata)
 {
-    AfbHandleT *glue= (AfbHandleT*)userdata;
+    GlueHandleT *glue= (GlueHandleT*)userdata;
     assert (glue && glue->magic == GLUE_RQT_MAGIC);
 
     // make sure rqt lua stack is empty, then free it
@@ -153,14 +153,14 @@ static void GlueRqtFree(void *userdata)
 }
 
 // add a reference on Glue handle
-void GlueRqtAddref(AfbHandleT *glue) {
+void GlueRqtAddref(GlueHandleT *glue) {
     if (glue->magic == GLUE_RQT_MAGIC) {
         afb_req_unref (glue->rqt.afb);
     }
 }
 
 // add a reference on Glue handle
-void GlueRqtUnref(AfbHandleT *glue) {
+void GlueRqtUnref(GlueHandleT *glue) {
     if (glue->magic == GLUE_RQT_MAGIC) {
         afb_req_unref (glue->rqt.afb);
     }
@@ -168,15 +168,15 @@ void GlueRqtUnref(AfbHandleT *glue) {
 }
 
 // allocate and push a lua request handle
-AfbHandleT *GlueRqtNew(afb_req_t afbRqt)
+GlueHandleT *GlueRqtNew(afb_req_t afbRqt)
 {
     assert(afbRqt);
 
     // retreive interpreteur from API
-    AfbHandleT *api = afb_api_get_userdata(afb_req_get_api(afbRqt));
+    GlueHandleT *api = afb_api_get_userdata(afb_req_get_api(afbRqt));
     assert(api->magic == GLUE_API_MAGIC);
 
-    AfbHandleT *glue = (AfbHandleT *)calloc(1, sizeof(AfbHandleT));
+    GlueHandleT *glue = (GlueHandleT *)calloc(1, sizeof(GlueHandleT));
     glue->magic = GLUE_RQT_MAGIC;
     glue->rqt.afb = afbRqt;
     glue->luaState = lua_newthread(api->luaState);
@@ -188,7 +188,7 @@ AfbHandleT *GlueRqtNew(afb_req_t afbRqt)
 }
 
 // reply afb request only once and unref lua handle
-int GlueReply(AfbHandleT *glue, int status, int nbreply, afb_data_t *reply)
+int GlueReply(GlueHandleT *glue, int status, int nbreply, afb_data_t *reply)
 {
     if (glue->rqt.replied) goto OnErrorExit;
     afb_req_reply(glue->rqt.afb, status, nbreply, reply);
@@ -201,9 +201,9 @@ OnErrorExit:
 }
 
 // binder handle is pushed as 1st upvalue during lua/C lib creation
-AfbHandleT *LuaBinderPop(lua_State *luaState)
+GlueHandleT *LuaBinderPop(lua_State *luaState)
 {
-    AfbHandleT *handle = lua_touserdata(luaState, lua_upvalueindex(1));
+    GlueHandleT *handle = lua_touserdata(luaState, lua_upvalueindex(1));
     assert(handle && handle->magic == GLUE_BINDER_MAGIC);
     return handle;
 }
@@ -407,7 +407,7 @@ OnErrorExit:
 
 // afb_req_v4_get_common(
 
-void LuaInfoDbg(lua_State *luaState, AfbHandleT *handle, int level, const char *func, const char *message)
+void LuaInfoDbg(lua_State *luaState, GlueHandleT *handle, int level, const char *func, const char *message)
 {
     lua_Debug luaDebug;
     const char *error;
@@ -467,12 +467,12 @@ int LuaPrintMsg(lua_State *luaState, int level)
     const char *errorMsg = NULL;
 
     // get binder handle
-    AfbHandleT *binder = LuaBinderPop(luaState);
+    GlueHandleT *binder = LuaBinderPop(luaState);
     if (!binder)
         goto OnErrorExit;
 
     // check api handle
-    AfbHandleT *glue = lua_touserdata(luaState, LUA_FIRST_ARG);
+    GlueHandleT *glue = lua_touserdata(luaState, LUA_FIRST_ARG);
     if (!glue)
     {
         errorMsg = "missing require api/rqt handle";
