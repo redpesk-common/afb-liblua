@@ -32,18 +32,20 @@
 typedef struct {
     GlueHandleT  *handle;
     char *luafunc;
-    void *context;
+    void *userdata;
 } LuaAsyncCtxT;
 
-void GlueEvtHandlerCb(void *context, const char *event_name,	unsigned nparams, afb_data_x4_t const params[],	afb_api_t api);
-void GlueApiSubcallCb(void *context, int status, unsigned nreplies, afb_data_t const replies[], afb_api_t api);
-void GlueRqtSubcallCb(void *context, int status, unsigned nreplies, afb_data_t const replies[], afb_req_t req);
-int  GlueCtrlCb(afb_api_t apiv4, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *context);
-void GlueVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[]);
+void GlueApiEventCb(void *userdata, const char *event_name,	unsigned nparams, afb_data_x4_t const params[],	afb_api_t api);
+void GlueApiSubcallCb(void *userdata, int status, unsigned nreplies, afb_data_t const replies[], afb_api_t api);
+void GlueRqtSubcallCb(void *userdata, int status, unsigned nreplies, afb_data_t const replies[], afb_req_t req);
+int  GlueCtrlCb(afb_api_t apiv4, afb_ctlid_t ctlid, afb_ctlarg_t ctlarg, void *userdata);
+void GlueApiVerbCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[]);
 void GlueInfoCb(afb_req_t afbRqt, unsigned nparams, afb_data_t const params[]);
-void GlueTimerCb (afb_timer_x4_t timer, void *context, int decount);
-int GlueStartupCb(void *callback, void *context);
+void GlueTimerCb (afb_timer_x4_t timer, void *userdata, int decount);
+int GlueStartupCb(void *callback, void *userdata);
 void GlueTimerClear(GlueHandleT *glue);
 
-void GlueSchedTimeoutCb (int signum, void *context);
-void GlueJobsStartCb (int signum, void *context, struct afb_sched_lock *afbLock);
+void GlueJobPostCb (int signum, void *userdata);
+void GlueJobStartCb (int signum, void *userdata, struct afb_sched_lock *afbLock);
+void GlueApiEventCb (void *userdata, const char *label, unsigned nparams, afb_data_x4_t const params[], afb_api_t api);
+void GlueEventCb (void *userdata, const char *label, unsigned nparams, afb_data_x4_t const params[], afb_api_t api);

@@ -30,7 +30,7 @@ local libafb=require('afb-luaglue')
 
 -- static variables
 local count= 0
-local event
+local evtid=nil
 
 -- When Api ready (state==init) start event & timer
 function apiControlCb(api, state)
@@ -44,10 +44,10 @@ function apiControlCb(api, state)
         local tictime= libafb.config(api,'tictime')*1000 -- move from second to ms
         libafb.notice(api, "api=[%s] start event tictime=%dms", apiname, tictime)
 
-        event= libafb.evtnew (api,{uid='lua-event', info='lua testing event sample'})
-        if (event == nil) then goto done end
+        evtid= libafb.evtnew (api, 'lua-event')
+        if (evtid == nil) then goto done end
 
-        local timer= libafb.timernew (api, {uid='lua-timer', callback='TimerCB', period=tictime, count=0}, event)
+        local timer= libafb.timernew (api, {uid='lua-timer', callback='TimerCB', period=tictime, count=0}, evtid)
         if (timer == nil) then goto done end
 
         ::done::
@@ -60,19 +60,11 @@ function apiControlCb(api, state)
     return 0 -- 0=ok -1=fatal
 end
 
--- executed when binder and all api/interfaces are ready to serv
-function mainLoopCb(binder)
-    libafb.notice(binder, "mainLoopCb=[%s]", libafb.config(binder, "uid"))
-    -- implement here after your startup/eventing code
-    -- ...
-    return 0 -- negative status force loopstart exit
-end
-
 -- timer handle callback
-function TimerCB (timer, evt)
+function TimerCB (timer, decount, evtid)
     count= count +1
-    libafb.notice (evt, "timer='%s' event='%s' count=%d", libafb.config(timer, 'uid'), libafb.config(evt, 'uid'), count)
-    libafb.evtpush(evt, {count=count})
+    libafb.notice (timer, "timer='%s' count=%d", libafb.config(timer, 'uid'), count)
+    libafb.evtpush(evtid, {count=count})
 end
 
  -- ping/pong event func
@@ -84,13 +76,13 @@ end
 
 function subscribeCB(rqt)
     libafb.notice  (rqt, "subscribing api event")
-    libafb.evtsubscribe (rqt, event)
+    libafb.evtsubscribe (rqt, evtid)
     return 0 -- implicit respond
 end
 
 function unsubscribeCB(rqt)
     libafb.notice  (rqt, "subscribing api event")
-    libafb.evtunsubscribe (rqt, event)
+    libafb.evtunsubscribe (rqt, evtid)
     return 0 -- implicit respond
 end
 
@@ -131,7 +123,7 @@ local binder= libafb.binder(binderOpts)
 local myapi= libafb.apiadd(apiOpts)
 
 -- should never return
-local status= libafb.loopstart('mainLoopCb')
+local status= libafb.loopstart(binder)
 if (status < 0) then
     libafb.error (binder, "OnError loopstart Exit")
 else

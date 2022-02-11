@@ -45,7 +45,7 @@ function otherEventCB (api, name, data)
 end
 
 function asyncRespCB(rqt, status, ctx, response)
-    libafb.notice  (rqt, "asyncRespCB status=%d ctx='%s', response='%s'", status, libafb.serialize(ctx), response)
+    libafb.notice  (rqt, "asyncRespCB status=%d ctx='%s', response='%s'", status, libafb.extract(ctx), response)
     libafb.reply (rqt, status, 'async helloworld/testargs', response)
 end
 
@@ -69,7 +69,7 @@ end
 
 function unsubscribeCB(rqt, query)
     libafb.notice  (rqt, "unsubscribeCB helloworld-event/unsubscribe")
-    local status= libafb.callsync(rqt, "helloworld-event","subscribe")
+    local status= libafb.callsync(rqt, "helloworld-event","unsubscribe")
     return (status) -- implicit response
 end
 
@@ -164,4 +164,4 @@ local event =libafb.binding(EventBinding)
 local luaapi=libafb.apiadd(demoApi)
 
 -- should never return
-local status= libafb.loopstart('mainLoopCb')
+local status= libafb.loopstart(binder, 'mainLoopCb')

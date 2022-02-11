@@ -37,18 +37,23 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+typedef struct {
+    char *uid;
+    char *callback;
+    void *userdata;
+} GlueAsyncCtxT;
 
 struct LuaBinderHandleS {
     AfbBinderHandleT *afb;
     json_object *configJ;
 };
 
-struct LuajobsstartS {
-    char *luafunc;
-    json_object *dataJ;
+struct LuaJobHandleS {
     struct afb_sched_lock *afb;
+    json_object *dataJ;
     afb_api_t  apiv4;
     int status;
+    GlueAsyncCtxT async;
 };
 
 struct LuaApiHandleS {
@@ -63,53 +68,47 @@ struct LuaRqtHandleS {
     afb_req_t afb;
 };
 
+struct LuaEvtHandleS {
+    afb_event_t afb;
+    afb_api_t apiv4;
+    char *pattern;
+    json_object *configJ;
+    GlueAsyncCtxT async;
+};
+
 struct LuaTimerHandleS {
-    const char *uid;
-    char *callback;
     afb_timer_t afb;
     afb_api_t apiv4;
     json_object *configJ;
-    void *userdata;
-    int usage;
+    GlueAsyncCtxT async;
 };
 
-struct LuaEvtHandleS {
-    const char *name;
-    afb_event_t afb;
+struct LuaPostHandleS {
     json_object *configJ;
     afb_api_t apiv4;
-    int count;
-};
-
-struct LuaHandlerHandleS {
-    const char *uid;
-    const char *callback;
-    json_object *configJ;
-    void *userdata;
-    int count;
-    afb_api_t apiv4;
+    GlueAsyncCtxT async;
 };
 
 typedef struct {
     GlueHandleMagicsE magic;
     lua_State *luaState;
+    int usage;
     union {
         struct LuaBinderHandleS binder;
-        struct LuaEvtHandleS evt;
+        struct LuaEvtHandleS event;
         struct LuaApiHandleS api;
         struct LuaRqtHandleS rqt;
         struct LuaTimerHandleS timer;
-        struct LuajobsstartS lock;
-        struct LuaHandlerHandleS handler;
+        struct LuaJobHandleS job;
+        struct LuaPostHandleS post;
     };
 } GlueHandleT;
 
 typedef struct {
     int magic;
     GlueHandleT *glue;
-    char *callback;
-    void *userdata;
-} GlueHandleCbT;
+    GlueAsyncCtxT async;
+} GlueCallHandleT;
 
 #define LUA_FIRST_ARG 1 // 1st argument
 #define LUA_MSG_MAX_LENGTH 2048

@@ -45,7 +45,7 @@ void GlueVerbose(GlueHandleT *handle, int level, const char *file, int line, con
     {
     case GLUE_API_MAGIC:
     case GLUE_EVT_MAGIC:
-    case GLUE_LOCK_MAGIC:
+    case GLUE_JOB_MAGIC:
         afb_api_vverbose(GlueGetApi(handle), level, file, line, func, fmt, args);
         break;
 
@@ -71,21 +71,10 @@ OnErrorExit:
     return NULL;
 }
 
-GlueHandleT *LuaEventPop(lua_State *luaState, int index)
-{
-    GlueHandleT *luaEvt = (GlueHandleT *)lua_touserdata(luaState, index);
-    if (!luaEvt || luaEvt->magic != GLUE_EVT_MAGIC || !afb_event_is_valid(luaEvt->evt.afb))
-        goto OnErrorExit;
-    return luaEvt;
-
-OnErrorExit:
-    return NULL;
-}
-
 GlueHandleT *LuaApiPop(lua_State *luaState, int index)
 {
     GlueHandleT *glue = (GlueHandleT *)lua_touserdata(luaState, index);
-    if (!glue || glue->magic != GLUE_API_MAGIC)
+    if (!glue || !GlueGetApi(glue))
         goto OnErrorExit;
     return glue;
 
@@ -95,7 +84,7 @@ OnErrorExit:
 GlueHandleT *LuaLockPop(lua_State *luaState, int index)
 {
     GlueHandleT *luaLock = (GlueHandleT *)lua_touserdata(luaState, index);
-    if (!luaLock || luaLock->magic != GLUE_LOCK_MAGIC)
+    if (!luaLock || luaLock->magic != GLUE_JOB_MAGIC)
         goto OnErrorExit;
     return luaLock;
 
@@ -116,11 +105,11 @@ afb_api_t GlueGetApi(GlueHandleT*glue) {
         case GLUE_BINDER_MAGIC:
             afbApi= AfbBinderGetApi(glue->binder.afb);
             break;
-        case GLUE_LOCK_MAGIC:
-            afbApi= glue->lock.apiv4;
+        case GLUE_JOB_MAGIC:
+            afbApi= glue->job.apiv4;
             break;
         case GLUE_EVT_MAGIC:
-            afbApi= glue->evt.apiv4;
+            afbApi= glue->event.apiv4;
             break;
         default:
             afbApi=NULL;
@@ -283,7 +272,7 @@ OnErrorExit:
 
 json_object *LuaPopOneArg(lua_State *luaState, int idx)
 {
-    json_object *value = NULL;
+    json_object *valueJ = NULL;
 
     int luaType = lua_type(luaState, idx);
     switch (luaType)
@@ -292,32 +281,34 @@ json_object *LuaPopOneArg(lua_State *luaState, int idx)
     {
         lua_Number number = lua_tonumber(luaState, idx);
         int nombre = (int)number; // evil trick to determine wether n fits in an integer. (stolen from ltcl.c)
-        if (number == nombre) value = json_object_new_int(nombre);
-        else value = json_object_new_double(number);
+        if (number == nombre) valueJ = json_object_new_int(nombre);
+        else valueJ = json_object_new_double(number);
         break;
     }
     case LUA_TBOOLEAN:
-        value = json_object_new_boolean(lua_toboolean(luaState, idx));
+        valueJ = json_object_new_boolean(lua_toboolean(luaState, idx));
         break;
     case LUA_TSTRING:
-        value = json_object_new_string(lua_tostring(luaState, idx));
+        valueJ = json_object_new_string(lua_tostring(luaState, idx));
         break;
     case LUA_TTABLE:
-        value = LuaTableToJson(luaState, idx);
+        valueJ = LuaTableToJson(luaState, idx);
         break;
     case LUA_TNIL:
-        value = json_object_new_string("nil");
+        valueJ = json_object_new_string("nil");
         break;
-    case LUA_TUSERDATA:
-        value = json_object_new_int64((int64_t)lua_touserdata(luaState, idx)); // store userdata as int !!!
+    case LUA_TUSERDATA: { // attach lighdata as userdata to a json empty string
+        void *pointer= lua_touserdata(luaState, idx);
+        valueJ = json_object_new_string("");
+        json_object_set_userdata(valueJ, pointer, NULL);
         break;
-
+    }
     default:
         ERROR("LuaPopOneArg: Unsupported type:%d/%s idx=%d", luaType, lua_typename(luaState, luaType), idx);
-        value = NULL;
+        valueJ = NULL;
     }
 
-    return value;
+    return valueJ;
 }
 
 json_object *LuaPopArgs(lua_State *luaState, int start)
@@ -382,9 +373,20 @@ int LuaPushOneArg(lua_State *luaState,json_object *argsJ)
     case json_type_int:
         lua_pushinteger(luaState, json_object_get_int64(argsJ));
         break;
-    case json_type_string:
+    case json_type_string: {
+        const char *text=  json_object_get_string(argsJ);
+        // null string is used to carry lightdata within json_object
+        if (text[0] == '\0') {
+            void *pointer;
+            pointer= json_object_get_userdata(argsJ);
+            if (pointer) {
+                lua_pushlightuserdata(luaState, pointer);
+                break;
+            }
+        }
         lua_pushstring(luaState, json_object_get_string(argsJ));
         break;
+        }
     case json_type_boolean:
         lua_pushboolean(luaState, json_object_get_boolean(argsJ));
         break;
@@ -425,12 +427,12 @@ void LuaInfoDbg(lua_State *luaState, GlueHandleT *handle, int level, const char 
 
     if (level != AFB_SYSLOG_LEVEL_ERROR)
     {
-        GlueVerbose(handle, level, source, line, func, "InLua->[%s]", message);
+        GlueVerbose(handle, level, source, line, func, "%s", message);
     }
     else
     {
         error = lua_tostring(luaState, -1);
-        GlueVerbose(handle, level, source, line, func, "InLua->[%s] error=[%s]", message, error);
+        GlueVerbose(handle, level, source, line, func, "%s error=[%s]", message, error);
     }
     return;
 

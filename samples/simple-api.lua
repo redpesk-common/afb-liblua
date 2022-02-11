@@ -66,17 +66,10 @@ local demoOpts = {
     rootdir = '.'
 }
 
--- executed when binder and all api/interfaces are ready to serv
-function loopBinderCb(binder)
-    libafb.notice(binder, "loopBinderCb=%s", libafb.config(binder, "uid"))
-    return 0 -- keep running for ever
-end
-
 -- create and start binder
 libafb.luastrict(true)
 local binder= libafb.binder(demoOpts)
 local myapi= libafb.apiadd(demoApi)
 
 -- should never return
-local status= libafb.loopstart('loopBinderCb')
-
+local status= libafb.loopstart(binder)

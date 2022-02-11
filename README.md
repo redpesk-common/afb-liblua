@@ -43,7 +43,7 @@ Go to code market place and download a version compatible with your editor versi
 Install your extention
 
 * codium --install-extension cpptools-linux.vsix
-* codium --install-extension yinfei.luahelper-0.2.10.vsix 
+* codium --install-extension yinfei.luahelper-0.2.10.vsix
 
 NOTE: I fail to use LUA vscode debugger (any input would be more than wellcome)
 WARNING: the lastest version is probably not compatible with your codium version.
@@ -132,7 +132,7 @@ local myapi= libafb.apiadd(demoApi)
 
 ## API/RQT Subcalls
 
-Both synchronous and asynchronous call are supported. The fact the subcall is done from a request or from a api context is abstracted to the user. When doing it from RQT context client security context is not propagated and remove event are claimed by the lua api.
+Both synchronous and asynchronous call are supported. The fact the subcall is done from a request or from a api userdata is abstracted to the user. When doing it from RQT userdata client security userdata is not propagated and remove event are claimed by the lua api.
 
 Explicit response to a request is done with ``` libafb.reply(rqt,status,arg1,..,argn)```. When running a synchronous request an implicit response may also be done with ```return(status, arg1,...,arg-n)```. Note that with afb-v4 an application may return zero, one or many data.
 
@@ -202,7 +202,7 @@ Event should attached to an API. As binder as a building secret API, it is never
 
 ```
 
-Client event subscription is handle with evtsubscribe|unsubcribe api. Subscription API should be call from a request context as in following example, extracted from sample/event-api.lua
+Client event subscription is handle with evtsubscribe|unsubcribe api. Subscription API should be call from a request userdata as in following example, extracted from sample/event-api.lua
 
 ```lua
     function subscribeCB(rqt)
@@ -242,21 +242,21 @@ In following example, timer runs forever every 'tictime' and call TimerCallback'
 
 ```
 
-When a one shot timer is enough 'jobspost' is usually a better choice. This is especially true for timeout handling. When use in conjunction with mainloop control.
+When a one shot timer is enough 'jobpost' is usually a better choice. This is especially true for timeout handling. When use in conjunction with mainloop control.
 
 ```lua
     -- timer handle callback
-    function TimeoutCB (handle, context)
-        -- do something with context
+    function TimeoutCB (handle, userdata)
+        -- do something with userdata
         libafb.notice (handle, "I'm in timer callback")
     end
 
-    -- jobspost callback run once and only once
-    jobid= libafb.jobspost (api, 'TimeoutCB', timeoutMS)
+    -- jobpost callback run once and only once
+    jobid= libafb.jobpost (api, 'TimeoutCB', timeoutMS)
     -- do something
 
     --
-    libafb.jobscancel (jobid) -- optionally kill timer before timeout.
+    libafb.jobcancel (jobid) -- optionally kill timer before timeout.
 ```
 
 
@@ -268,17 +268,17 @@ Mainloop starts with libafb.mainloop('xxx'), where 'xxx' is an optional startup 
 * when startup function returns ```status!=0``` the binder immediately exit with corresponding status. This case is very typical when running pure synchronous api test.
 * set a shedwait lock and control the main loop from asynchronous events. This later case is mandatory when we have to start the mainloop to listen event, but still need to exit it to run a new set of test.
 
-Mainloop schedule wait is done with ```libafb.jobsstart(binder,'xxx',timeout,{optional-user-data})```. Where 'xxx' is the name of the control callback that received the lock. JobsStart is released with ``` libafb.jobskill(rqt/evt,lock,status)```
+Mainloop schedule wait is done with ```libafb.jobstart(binder,'xxx',timeout,{optional-user-data})```. Where 'xxx' is the name of the control callback that received the lock. JobStart is released with ``` libafb.jobkill(rqt/evt,lock,status)```
 
 In following example:
-* jobsstart callback starts an event handler and passes the lock as evt context
+* jobstart callback starts an event handler and passes the lock as evt userdata
 * event handler: count the number of event and after 5 events release the lock.
 
 Note:
 
-* libafb.jobsstart does not return before the lock is releases. As for events it is the developer responsibility to either carry the lock in a context or to store it within a share space, on order unlock function to access it.
+* libafb.jobstart does not return before the lock is releases. As for events it is the developer responsibility to either carry the lock in a userdata or to store it within a share space, on order unlock function to access it.
 
-* it is possible to serialize libafb.jobsstart in order to build asynchronous cascade of asynchronous tests.
+* it is possible to serialize libafb.jobstart in order to build asynchronous cascade of asynchronous tests.
 
 ```lua
 
@@ -286,8 +286,8 @@ Note:
     function EventReceiveCB(evt, name, ctx, data)
         evtCount= evtCount +1
         if (evtCount == 5) then
-            -- jobskill(handle, lock, status)
-            libafb.jobskill (evt
+            -- jobkill(handle, lock, status)
+            libafb.jobkill (evt
                 , ctx
                 , evtCount
             )
@@ -295,7 +295,7 @@ Note:
     end
 
     -- retreive shedwait lock and attach it to the event handler
-    function JobsStartCB(api, lock, context)
+    function JobStartCB(api, lock, userdata)
         evtCount=0
         libafb.evthandler(api
             , {uid='timer-event', pattern='helloworld-event/timerCount',func='EventReceiveCB'}
@@ -304,10 +304,10 @@ Note:
         return 0;
         end
 
-    -- set a jobsstart on running mainloop
+    -- set a jobstart on running mainloop
     function startTestCB(binder)
-        status= libafb.jobsstart(binder
-            , 'JobsStartCB'
+        status= libafb.jobstart(binder
+            , 'JobStartCB'
             , timeout
             , nil -- optional userdata
         )
@@ -323,4 +323,4 @@ Note:
 * libafb.luastrict(true): prevents LUA from creating global variables.
 * libafb.config(handle, "key"): returns binder/rqt/timer/... config
 * libafb.notice|warning|error|debug print corresponding hookable syslog trace
-* libafb.serialize(data, "key") return key value from a json object
+* libafb.extract(data, "key") return key value from a json object

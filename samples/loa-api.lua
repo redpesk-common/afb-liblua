@@ -5,7 +5,7 @@ Copyright 2021 Fulup Ar Foll fulup@iot.bzh
 Licence: $RP_BEGIN_LICENSE$ SPDX:MIT https://opensource.org/licenses/MIT $RP_END_LICENSE$
 
 object:
-    loa-api.lua loanstrate how to use LOA and permission. While LOA can be tested outside of any context,
+    loa-api.lua loanstrate how to use LOA and permission. While LOA can be tested outside of any userdata,
     permission check requirer a valid Cynagora installation
 
     - loa/set current LOA level to 1
@@ -110,7 +110,7 @@ local binder= libafb.binder(loaOpts)
 local myapi= libafb.apiadd(loaApi)
 
 -- should never return
-local status= libafb.loopstart('loopBinderCb')
+local status= libafb.loopstart(binder, 'loopBinderCb')
 if (status < 0) then
     libafb.error (binder, "OnError loopstart Exit")
 else
